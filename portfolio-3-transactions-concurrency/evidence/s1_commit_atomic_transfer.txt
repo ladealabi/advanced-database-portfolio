@@ -1,0 +1,53 @@
+SCENARIO: COMMIT: an atomic transfer becomes visible only after COMMIT
+==============================================================================
+Session A transfers N10,000 from Ada (8880000001) to Bayo (8880000003) inside
+an explicit transaction. Session B observes before and after A commits.
+Atomicity: the debit, the credit, the txn row and both ledger legs are applied
+together. Durability: after COMMIT the change is in the WAL and survives a
+crash.
+
+Timeline (seconds since start | session | '>>' = statement sent, otherwise = server output)
+------------------------------------------------------------------------------
+  0.31s  B >> SELECT account_number, balance FROM account WHERE account_number IN ('8880000001','8880000002','8880000003') ORDER BY 1;
+  1.01s  B |  account_number | balance
+  1.01s  B | ----------------+----------
+  1.01s  B |  8880000001     | 50000.00
+  1.01s  B |  8880000002     | 50000.00
+  1.01s  B |  8880000003     | 50000.00
+  1.01s  B | (3 rows)
+  1.23s  A >> BEGIN;
+  1.53s  A >> SELECT transfer_funds('8880000001', '8880000003', 10000, 'MOBILE', 'P3 demo commit') AS txn_id;
+  1.55s  A |  txn_id
+  1.55s  A | --------
+  1.55s  A |  519324
+  1.55s  A | (1 row)
+  2.13s  A >> SELECT account_number, balance FROM account WHERE account_number IN ('8880000001','8880000002','8880000003') ORDER BY 1;
+  2.13s  A |  account_number | balance
+  2.13s  A | ----------------+----------
+  2.13s  A |  8880000001     | 40000.00
+  2.13s  A |  8880000002     | 50000.00
+  2.13s  A |  8880000003     | 60000.00
+  2.13s  A | (3 rows)
+  2.74s  -- A has not committed yet. B must still see the OLD balances (no dirty read):
+  2.74s  B >> SELECT account_number, balance FROM account WHERE account_number IN ('8880000001','8880000002','8880000003') ORDER BY 1;
+  2.74s  B |  account_number | balance
+  2.74s  B | ----------------+----------
+  2.74s  B |  8880000001     | 50000.00
+  2.74s  B |  8880000002     | 50000.00
+  2.74s  B |  8880000003     | 50000.00
+  2.74s  B | (3 rows)
+  3.34s  A >> COMMIT;
+  3.85s  -- After COMMIT, B sees the new balances:
+  3.85s  B >> SELECT account_number, balance FROM account WHERE account_number IN ('8880000001','8880000002','8880000003') ORDER BY 1;
+  3.85s  B |  account_number | balance
+  3.85s  B | ----------------+----------
+  3.85s  B |  8880000001     | 40000.00
+  3.85s  B |  8880000002     | 50000.00
+  3.85s  B |  8880000003     | 60000.00
+  3.85s  B | (3 rows)
+  4.45s  B >> SELECT le.direction, le.amount, le.balance_after, a.account_number FROM ledger_entry le JOIN account a USING (account_id) WHERE txn_id = (SELECT max(txn_id) FROM txn WHERE narration='P3 demo commit') ORDER BY direction DESC;
+  4.46s  B |  direction |  amount  | balance_after | account_number
+  4.46s  B | -----------+----------+---------------+----------------
+  4.46s  B |  D         | 10000.00 |      40000.00 | 8880000001
+  4.46s  B |  C         | 10000.00 |      60000.00 | 8880000003
+  4.46s  B | (2 rows)

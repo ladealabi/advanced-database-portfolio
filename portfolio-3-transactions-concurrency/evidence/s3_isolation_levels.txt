@@ -1,0 +1,62 @@
+SCENARIO: ISOLATION: READ COMMITTED vs REPEATABLE READ (non-repeatable read)
+==============================================================================
+A branch report (session A) reads Ada's balance twice inside one transaction
+while session B commits a transfer in between. Under READ COMMITTED each
+statement sees a new snapshot, so the second read differs (non-repeatable
+read). Under REPEATABLE READ the whole transaction uses one snapshot, so both
+reads agree. PostgreSQL never allows dirty reads, even at READ UNCOMMITTED.
+
+Timeline (seconds since start | session | '>>' = statement sent, otherwise = server output)
+------------------------------------------------------------------------------
+  0.00s  -- --- Part 1: READ COMMITTED (PostgreSQL default) ---
+  0.30s  A >> BEGIN ISOLATION LEVEL READ COMMITTED;
+  0.50s  A >> SELECT 'read #1' AS r, balance FROM account WHERE account_number = '8880000001';
+  0.51s  A |     r    | balance
+  0.51s  A | ---------+----------
+  0.51s  A |  read #1 | 50000.00
+  0.51s  A | (1 row)
+  1.32s  B >> SELECT transfer_funds('8880000001', '8880000003', 2000, 'USSD', 'P3 demo iso RC');
+  1.34s  B |  transfer_funds
+  1.34s  B | ----------------
+  1.34s  B |          519333
+  1.34s  B | (1 row)
+  1.82s  A >> SELECT 'read #2' AS r, balance FROM account WHERE account_number = '8880000001';
+  1.82s  A |     r    | balance
+  1.82s  A | ---------+----------
+  1.82s  A |  read #2 | 48000.00
+  1.82s  A | (1 row)
+  2.33s  A >> COMMIT;
+  2.73s  -- --- Part 2: REPEATABLE READ ---
+  2.73s  A >> BEGIN ISOLATION LEVEL REPEATABLE READ;
+  2.93s  A >> SELECT 'read #1' AS r, balance FROM account WHERE account_number = '8880000001';
+  2.93s  A |     r    | balance
+  2.93s  A | ---------+----------
+  2.93s  A |  read #1 | 48000.00
+  2.93s  A | (1 row)
+  3.44s  B >> SELECT transfer_funds('8880000001', '8880000003', 2000, 'USSD', 'P3 demo iso RR');
+  3.44s  B |  transfer_funds
+  3.44s  B | ----------------
+  3.44s  B |          519334
+  3.44s  B | (1 row)
+  3.94s  A >> SELECT 'read #2' AS r, balance FROM account WHERE account_number = '8880000001';
+  3.94s  A |     r    | balance
+  3.94s  A | ---------+----------
+  3.94s  A |  read #2 | 48000.00
+  3.94s  A | (1 row)
+  4.45s  A >> COMMIT;
+  4.75s  A >> SELECT 'after commit' AS r, balance FROM account WHERE account_number = '8880000001';
+  4.75s  A |       r       | balance
+  4.75s  A | --------------+----------
+  4.75s  A |  after commit | 46000.00
+  4.75s  A | (1 row)
+  5.15s  -- --- Part 3: READ UNCOMMITTED still gives no dirty read in PostgreSQL ---
+  5.15s  B >> BEGIN;
+  5.26s  B >> UPDATE account SET balance = balance + 1000000 WHERE account_number = '8880000001';
+  5.66s  A >> BEGIN ISOLATION LEVEL READ UNCOMMITTED;
+  5.76s  A >> SELECT 'uncommitted?' AS r, balance FROM account WHERE account_number = '8880000001';
+  5.76s  A |       r       | balance
+  5.76s  A | --------------+----------
+  5.76s  A |  uncommitted? | 46000.00
+  5.76s  A | (1 row)
+  6.16s  A >> COMMIT;
+  6.27s  B >> ROLLBACK;

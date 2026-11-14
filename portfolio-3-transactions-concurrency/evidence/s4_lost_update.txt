@@ -1,0 +1,119 @@
+SCENARIO: CONCURRENCY PROBLEM: lost update, and three ways to prevent it
+==============================================================================
+A naive application reads the balance, subtracts in application code, then
+writes the result back. Two ATM withdrawals (N10,000 by A and N20,000 by B)
+run at the same time against Ada's N50,000. Correct final balance: N20,000.
+Part 1 shows the anomaly: B overwrites A's update. Part 2 prevents it with
+pessimistic locking (SELECT ... FOR UPDATE). Part 3 uses REPEATABLE READ,
+where PostgreSQL detects the conflict and aborts B, which must retry. Part 4
+uses an atomic UPDATE balance = balance - x.
+
+Timeline (seconds since start | session | '>>' = statement sent, otherwise = server output)
+------------------------------------------------------------------------------
+  0.00s  -- --- Part 1: naive read-modify-write at READ COMMITTED -> LOST UPDATE ---
+  0.31s  A >> BEGIN;
+  0.72s  B >> BEGIN;
+  0.92s  A >> SELECT balance FROM account WHERE account_number = '8880000001';
+  0.93s  A |  balance
+  0.93s  A | ----------
+  0.93s  A |  50000.00
+  0.93s  A | (1 row)
+  1.23s  B >> SELECT balance FROM account WHERE account_number = '8880000001';
+  1.23s  B |  balance
+  1.23s  B | ----------
+  1.23s  B |  50000.00
+  1.23s  B | (1 row)
+  1.53s  -- both sessions read 50000; the app computes 50000-10000 and 50000-20000
+  1.53s  A >> UPDATE account SET balance = 40000 WHERE account_number = '8880000001';
+  1.83s  A >> COMMIT;
+  2.14s  B >> UPDATE account SET balance = 30000 WHERE account_number = '8880000001';
+  2.44s  B >> COMMIT;
+  2.74s  A >> SELECT balance AS final_balance_should_be_20000 FROM account WHERE account_number = '8880000001';
+  2.74s  A |  final_balance_should_be_20000
+  2.74s  A | -------------------------------
+  2.74s  A |                       30000.00
+  2.74s  A | (1 row)
+  3.34s  -- N10,000 withdrawal LOST. The ledger reconciliation in 00_setup detects and repairs this drift.
+  3.34s  A >> SELECT * FROM (SELECT a.balance AS stored, (SELECT balance_after FROM ledger_entry le WHERE le.account_id=a.account_id ORDER BY created_at DESC, entry_id DESC LIMIT 1) AS ledger FROM account a WHERE account_number = '8880000001') x;
+  3.35s  A |   stored  |  ledger
+  3.35s  A | ----------+----------
+  3.35s  A |  30000.00 | 50000.00
+  3.35s  A | (1 row)
+  3.95s  A >> UPDATE account SET balance = 50000 WHERE account_number = '8880000001';
+  4.45s  -- --- Part 2: pessimistic locking with SELECT ... FOR UPDATE ---
+  4.45s  A >> BEGIN;
+  4.55s  B >> BEGIN;
+  4.76s  A >> SELECT balance FROM account WHERE account_number = '8880000001' FOR UPDATE;
+  4.76s  A |  balance
+  4.76s  A | ----------
+  4.76s  A |  50000.00
+  4.76s  A | (1 row)
+  5.16s  B >> SELECT balance FROM account WHERE account_number = '8880000001' FOR UPDATE;
+  6.28s  C >> SELECT application_name, wait_event_type, wait_event, state FROM pg_stat_activity WHERE application_name LIKE 'session_%' ORDER BY 1;
+  6.29s  C |  application_name | wait_event_type |  wait_event   |        state
+  6.29s  C | ------------------+-----------------+---------------+---------------------
+  6.29s  C |  session_A        | Client          | ClientRead    | idle in transaction
+  6.29s  C |  session_B        | Lock            | transactionid | active
+  6.29s  C |  session_C        |                 |               | active
+  6.29s  C | (3 rows)
+  6.88s  -- B is BLOCKED (wait_event = transactionid) until A finishes
+  6.88s  A >> UPDATE account SET balance = 40000 WHERE account_number = '8880000001';
+  7.18s  A >> COMMIT;
+  7.18s  B |  balance
+  7.18s  B | ----------
+  7.18s  B |  40000.00
+  7.18s  B | (1 row)
+  7.78s  -- B is released and now reads 40000 (the committed value), so it writes 40000-20000
+  7.78s  B >> UPDATE account SET balance = 20000 WHERE account_number = '8880000001';
+  8.09s  B >> COMMIT;
+  8.39s  A >> SELECT balance AS final_balance FROM account WHERE account_number = '8880000001';
+  8.39s  A |  final_balance
+  8.39s  A | ---------------
+  8.39s  A |       20000.00
+  8.39s  A | (1 row)
+  8.89s  A >> UPDATE account SET balance = 50000 WHERE account_number = '8880000001';
+  9.40s  -- --- Part 3: optimistic approach with REPEATABLE READ (first committer wins) ---
+  9.40s  A >> BEGIN ISOLATION LEVEL REPEATABLE READ;
+  9.50s  B >> BEGIN ISOLATION LEVEL REPEATABLE READ;
+  9.71s  A >> SELECT balance FROM account WHERE account_number = '8880000001';
+  9.71s  A |  balance
+  9.71s  A | ----------
+  9.71s  A |  50000.00
+  9.71s  A | (1 row)
+ 10.01s  B >> SELECT balance FROM account WHERE account_number = '8880000001';
+ 10.01s  B |  balance
+ 10.01s  B | ----------
+ 10.01s  B |  50000.00
+ 10.01s  B | (1 row)
+ 10.31s  A >> UPDATE account SET balance = 40000 WHERE account_number = '8880000001';
+ 10.62s  B >> UPDATE account SET balance = 30000 WHERE account_number = '8880000001';
+ 11.22s  A >> COMMIT;
+ 11.22s  B | ERROR:  could not serialize access due to concurrent update
+ 11.82s  -- B is aborted with a serialization failure; the application must ROLLBACK and RETRY
+ 11.82s  B >> ROLLBACK;
+ 12.03s  B >> BEGIN ISOLATION LEVEL REPEATABLE READ;
+ 12.13s  B >> SELECT balance FROM account WHERE account_number = '8880000001';
+ 12.13s  B |  balance
+ 12.13s  B | ----------
+ 12.13s  B |  40000.00
+ 12.13s  B | (1 row)
+ 12.44s  B >> UPDATE account SET balance = 20000 WHERE account_number = '8880000001';
+ 12.74s  B >> COMMIT;
+ 13.04s  A >> SELECT balance AS final_balance FROM account WHERE account_number = '8880000001';
+ 13.04s  A |  final_balance
+ 13.04s  A | ---------------
+ 13.04s  A |       20000.00
+ 13.04s  A | (1 row)
+ 13.55s  A >> UPDATE account SET balance = 50000 WHERE account_number = '8880000001';
+ 14.05s  -- --- Part 4: atomic in-place update (what transfer_funds() does) ---
+ 14.05s  A >> BEGIN;
+ 14.16s  B >> BEGIN;
+ 14.36s  A >> UPDATE account SET balance = balance - 10000 WHERE account_number = '8880000001';
+ 14.66s  B >> UPDATE account SET balance = balance - 20000 WHERE account_number = '8880000001';
+ 15.27s  A >> COMMIT;
+ 15.77s  B >> COMMIT;
+ 16.07s  A >> SELECT balance AS final_balance FROM account WHERE account_number = '8880000001';
+ 16.07s  A |  final_balance
+ 16.07s  A | ---------------
+ 16.07s  A |       20000.00
+ 16.07s  A | (1 row)

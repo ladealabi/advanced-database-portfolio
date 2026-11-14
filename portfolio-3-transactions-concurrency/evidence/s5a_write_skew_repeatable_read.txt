@@ -1,0 +1,44 @@
+SCENARIO: CONCURRENCY PROBLEM: write skew under REPEATABLE READ (snapshot isolation)
+==============================================================================
+KYC tier-1 rule (customer level, not account level): Ada may send at most
+N60,000 per day across ALL her accounts. Two requests arrive at the same
+moment: N40,000 from her SAVINGS to Bayo (session A) and N40,000 from her
+CURRENT account to a merchant (session B). Each checks the daily total, sees
+N0 used, and proceeds. The two transactions read the same data but write
+DIFFERENT rows, so row locks and REPEATABLE READ (snapshot isolation) cannot
+see a conflict. Result: both commit and Ada sends N80,000, which breaks the
+N60,000 rule.
+
+Timeline (seconds since start | session | '>>' = statement sent, otherwise = server output)
+------------------------------------------------------------------------------
+  0.31s  A >> BEGIN ISOLATION LEVEL REPEATABLE READ;
+  0.72s  B >> BEGIN ISOLATION LEVEL REPEATABLE READ;
+  0.92s  A >> SELECT COALESCE(sum(le.amount),0) AS used_today FROM ledger_entry le JOIN txn t USING (txn_id) JOIN account a USING (account_id) JOIN customer c USING (customer_id) WHERE c.bvn='88800000001' AND le.direction='D' AND t.narration LIKE 'P3 skew%' AND le.created_at >= date_trunc('day', now());
+  0.93s  A |  used_today
+  0.93s  A | ------------
+  0.93s  A |           0
+  0.93s  A | (1 row)
+  1.33s  B >> SELECT COALESCE(sum(le.amount),0) AS used_today FROM ledger_entry le JOIN txn t USING (txn_id) JOIN account a USING (account_id) JOIN customer c USING (customer_id) WHERE c.bvn='88800000001' AND le.direction='D' AND t.narration LIKE 'P3 skew%' AND le.created_at >= date_trunc('day', now());
+  1.34s  B |  used_today
+  1.34s  B | ------------
+  1.34s  B |           0
+  1.34s  B | (1 row)
+  1.73s  -- both see used_today = 0, so a N40,000 transfer looks allowed (limit N60,000)
+  1.73s  A >> SELECT transfer_funds('8880000001', '8880000003', 40000, 'MOBILE', 'P3 skew via savings');
+  1.75s  A |  transfer_funds
+  1.75s  A | ----------------
+  1.75s  A |          519337
+  1.75s  A | (1 row)
+  2.14s  B >> SELECT transfer_funds('8880000002', '8880001001', 40000, 'MOBILE', 'P3 skew via current');
+  2.15s  B |  transfer_funds
+  2.15s  B | ----------------
+  2.15s  B |          519338
+  2.15s  B | (1 row)
+  2.54s  A >> COMMIT;
+  2.94s  B >> COMMIT;
+  3.44s  A >> SELECT COALESCE(sum(le.amount),0) AS total_sent_today__limit_is_60000 FROM ledger_entry le JOIN txn t USING (txn_id) JOIN account a USING (account_id) JOIN customer c USING (customer_id) WHERE c.bvn='88800000001' AND le.direction='D' AND t.narration LIKE 'P3 skew%' AND le.created_at >= date_trunc('day', now());
+  3.45s  A |  total_sent_today__limit_is_60000
+  3.45s  A | ----------------------------------
+  3.45s  A |                          80000.00
+  3.45s  A | (1 row)
+  4.05s  A >> UPDATE txn SET narration = 'P3 demo skew (cleared)' WHERE narration LIKE 'P3 skew%';

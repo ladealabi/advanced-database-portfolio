@@ -1,0 +1,82 @@
+SCENARIO: STRESS TEST: 16 concurrent clients calling transfer_funds() for 20s
+==============================================================================
+Random transfers between 100 accounts. Opposite-direction transfers on the same pair happen
+constantly, so without lock ordering this would deadlock. The invariants checked afterwards:
+money is conserved, every txn is balanced, no negative balances, and no new deadlocks.
+
+=== (a) COMPARISON: naive transfer, inconsistent lock order, 10s ===
+pgbench (16.15 (Postgres.app))
+transaction type: /Users/mac/Documents/advanced-database-portfolio/portfolio-3-transactions-concurrency/sql/pgbench_naive_transfer.sql
+scaling factor: 1
+query mode: simple
+number of clients: 16
+number of threads: 4
+maximum number of tries: 1
+duration: 10 s
+number of transactions actually processed: 18341
+number of failed transactions: 9 (0.049%)
+number of serialization failures: 0 (0.000%)
+number of deadlock failures: 9 (0.049%)
+latency average = 8.968 ms (including failures)
+initial connection time = 91.906 ms
+tps = 1783.219748 (without initial connection time)
+
+
+=== (b) transfer_funds() with ordered locking ===
+pgbench (16.15 (Postgres.app))
+transaction type: /Users/mac/Documents/advanced-database-portfolio/portfolio-3-transactions-concurrency/sql/pgbench_transfer.sql
+scaling factor: 1
+query mode: simple
+number of clients: 16
+number of threads: 4
+maximum number of tries: 5
+duration: 20 s
+number of transactions actually processed: 60422
+number of failed transactions: 0 (0.000%)
+number of serialization failures: 0 (0.000%)
+number of deadlock failures: 0 (0.000%)
+number of transactions retried: 0 (0.000%)
+total number of retries: 0
+latency average = 5.274 ms
+latency stddev = 5.424 ms
+initial connection time = 90.605 ms
+tps = 3031.077550 (without initial connection time)
+
+progress: 5.0 s, 4528.8 tps, lat 3.466 ms stddev 3.885, 0 failed, 0 retried, 0 retries
+progress: 10.0 s, 2961.6 tps, lat 5.400 ms stddev 4.584, 0 failed, 0 retried, 0 retries
+progress: 15.0 s, 2427.9 tps, lat 6.586 ms stddev 6.462, 0 failed, 0 retried, 0 retries
+progress: 20.0 s, 2161.4 tps, lat 7.402 ms stddev 6.600, 0 failed, 0 retried, 0 retries
+
+=== invariant checks after (b) ===
+SET
+Total money across the 100 stress accounts (must equal the value before the test):
+ total_before | total_after  | money_conserved 
+--------------+--------------+-----------------
+ 100000000.00 | 100000000.00 | t
+(1 row)
+
+Transfers committed during the test:
+ stress_txns | value_moved 
+-------------+-------------
+       60422 | 15180102.00
+(1 row)
+
+Unbalanced txns (must be 0):
+ unbalanced 
+------------
+          0
+(1 row)
+
+Stored balance vs ledger (must be 0 mismatches):
+ mismatches 
+------------
+          0
+(1 row)
+
+New deadlocks during the test (must be 0):
+ new_deadlocks 
+---------------
+             0
+(1 row)
+
+

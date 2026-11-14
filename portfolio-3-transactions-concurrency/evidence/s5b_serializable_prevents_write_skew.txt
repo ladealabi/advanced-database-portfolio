@@ -1,0 +1,57 @@
+SCENARIO: CONCURRENCY CONTROL: SERIALIZABLE (SSI) prevents the write skew
+==============================================================================
+KYC tier-1 rule (customer level, not account level): Ada may send at most
+N60,000 per day across ALL her accounts. Two requests arrive at the same
+moment: N40,000 from her SAVINGS to Bayo (session A) and N40,000 from her
+CURRENT account to a merchant (session B). Each checks the daily total, sees
+N0 used, and proceeds. The two transactions read the same data but write
+DIFFERENT rows, so row locks and REPEATABLE READ (snapshot isolation) cannot
+see a conflict. Under SERIALIZABLE, PostgreSQL's Serializable Snapshot
+Isolation tracks the read->write dependencies between the two transactions (a
+'dangerous structure') and aborts one with SQLSTATE 40001. The application
+retries it, the re-check now sees N40,000 already used, and the request is
+declined.
+
+Timeline (seconds since start | session | '>>' = statement sent, otherwise = server output)
+------------------------------------------------------------------------------
+  0.31s  A >> BEGIN ISOLATION LEVEL SERIALIZABLE;
+  0.72s  B >> BEGIN ISOLATION LEVEL SERIALIZABLE;
+  0.93s  A >> SELECT COALESCE(sum(le.amount),0) AS used_today FROM ledger_entry le JOIN txn t USING (txn_id) JOIN account a USING (account_id) JOIN customer c USING (customer_id) WHERE c.bvn='88800000001' AND le.direction='D' AND t.narration LIKE 'P3 skew%' AND le.created_at >= date_trunc('day', now());
+  0.93s  A |  used_today
+  0.93s  A | ------------
+  0.93s  A |           0
+  0.93s  A | (1 row)
+  1.33s  B >> SELECT COALESCE(sum(le.amount),0) AS used_today FROM ledger_entry le JOIN txn t USING (txn_id) JOIN account a USING (account_id) JOIN customer c USING (customer_id) WHERE c.bvn='88800000001' AND le.direction='D' AND t.narration LIKE 'P3 skew%' AND le.created_at >= date_trunc('day', now());
+  1.34s  B |  used_today
+  1.34s  B | ------------
+  1.34s  B |           0
+  1.34s  B | (1 row)
+  1.73s  -- both see used_today = 0, so a N40,000 transfer looks allowed (limit N60,000)
+  1.73s  A >> SELECT transfer_funds('8880000001', '8880000003', 40000, 'MOBILE', 'P3 skew via savings');
+  1.75s  A |  transfer_funds
+  1.75s  A | ----------------
+  1.75s  A |          519343
+  1.75s  A | (1 row)
+  2.14s  B >> SELECT transfer_funds('8880000002', '8880001001', 40000, 'MOBILE', 'P3 skew via current');
+  2.15s  B |  transfer_funds
+  2.15s  B | ----------------
+  2.15s  B |          519344
+  2.15s  B | (1 row)
+  2.54s  A >> COMMIT;
+  2.94s  B >> COMMIT;
+  2.95s  B | ERROR:  could not serialize access due to read/write dependencies among transactions
+  3.45s  A >> SELECT COALESCE(sum(le.amount),0) AS total_sent_today__limit_is_60000 FROM ledger_entry le JOIN txn t USING (txn_id) JOIN account a USING (account_id) JOIN customer c USING (customer_id) WHERE c.bvn='88800000001' AND le.direction='D' AND t.narration LIKE 'P3 skew%' AND le.created_at >= date_trunc('day', now());
+  3.45s  A |  total_sent_today__limit_is_60000
+  3.45s  A | ----------------------------------
+  3.45s  A |                          40000.00
+  3.45s  A | (1 row)
+  4.05s  -- application RETRY of the aborted transaction (SQLSTATE 40001 => retry):
+  4.05s  B >> BEGIN ISOLATION LEVEL SERIALIZABLE;
+  4.16s  B >> SELECT COALESCE(sum(le.amount),0) AS used_today FROM ledger_entry le JOIN txn t USING (txn_id) JOIN account a USING (account_id) JOIN customer c USING (customer_id) WHERE c.bvn='88800000001' AND le.direction='D' AND t.narration LIKE 'P3 skew%' AND le.created_at >= date_trunc('day', now());
+  4.16s  B |  used_today
+  4.16s  B | ------------
+  4.16s  B |    40000.00
+  4.16s  B | (1 row)
+  4.56s  -- 40,000 already used + 40,000 requested > 60,000, so the app declines the request
+  4.56s  B >> ROLLBACK;
+  4.86s  A >> UPDATE txn SET narration = 'P3 demo skew (cleared)' WHERE narration LIKE 'P3 skew%';

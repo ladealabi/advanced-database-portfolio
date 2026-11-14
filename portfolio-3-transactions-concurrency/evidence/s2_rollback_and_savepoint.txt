@@ -1,0 +1,84 @@
+SCENARIO: ROLLBACK: explicit rollback, automatic rollback on error, and SAVEPOINT
+==============================================================================
+(1) An explicit ROLLBACK undoes a completed transfer. (2) A transfer that
+breaks a business rule (insufficient funds) raises an error, the whole
+transaction is aborted, and nothing can run until ROLLBACK. (3) A batch of
+three payments uses SAVEPOINTs, so the one failing payment is rolled back on
+its own and the other two still commit.
+
+Timeline (seconds since start | session | '>>' = statement sent, otherwise = server output)
+------------------------------------------------------------------------------
+  0.31s  A >> SELECT account_number, balance FROM account WHERE account_number IN ('8880000001','8880000002','8880000003') ORDER BY 1;
+  0.31s  A |  account_number | balance
+  0.31s  A | ----------------+----------
+  0.31s  A |  8880000001     | 50000.00
+  0.31s  A |  8880000002     | 50000.00
+  0.31s  A |  8880000003     | 50000.00
+  0.31s  A | (3 rows)
+  0.81s  -- (1) explicit ROLLBACK
+  0.81s  A >> BEGIN;
+  1.01s  A >> SELECT transfer_funds('8880000001', '8880000003', 7000, 'WEB', 'P3 demo rollback');
+  1.03s  A |  transfer_funds
+  1.03s  A | ----------------
+  1.03s  A |          519327
+  1.03s  A | (1 row)
+  1.42s  A >> SELECT account_number, balance FROM account WHERE account_number IN ('8880000001','8880000002','8880000003') ORDER BY 1;
+  1.42s  A |  account_number | balance
+  1.42s  A | ----------------+----------
+  1.42s  A |  8880000001     | 43000.00
+  1.42s  A |  8880000002     | 50000.00
+  1.42s  A |  8880000003     | 57000.00
+  1.42s  A | (3 rows)
+  1.82s  A >> ROLLBACK;
+  2.12s  A >> SELECT account_number, balance FROM account WHERE account_number IN ('8880000001','8880000002','8880000003') ORDER BY 1;
+  2.12s  A |  account_number | balance
+  2.12s  A | ----------------+----------
+  2.12s  A |  8880000001     | 50000.00
+  2.12s  A |  8880000002     | 50000.00
+  2.12s  A |  8880000003     | 50000.00
+  2.12s  A | (3 rows)
+  2.62s  -- (2) error -> the transaction is aborted -> everything in it is rolled back
+  2.62s  A >> BEGIN;
+  2.83s  A >> SELECT transfer_funds('8880000001', '8880000003', 5000, 'WEB', 'P3 demo ok part');
+  2.83s  A |  transfer_funds
+  2.83s  A | ----------------
+  2.83s  A |          519328
+  2.83s  A | (1 row)
+  3.23s  A >> SELECT transfer_funds('8880000001', '8880000003', 900000, 'WEB', 'P3 demo too big');
+  3.24s  A | ERROR:  Insufficient funds: balance 45000.00, amount 900000, minimum balance 1000.00
+  3.64s  A >> SELECT 'can I continue?';
+  3.64s  A | ERROR:  current transaction is aborted, commands ignored until end of transaction block
+  4.04s  A >> ROLLBACK;
+  4.35s  A >> SELECT account_number, balance FROM account WHERE account_number IN ('8880000001','8880000002','8880000003') ORDER BY 1;
+  4.35s  A |  account_number | balance
+  4.35s  A | ----------------+----------
+  4.35s  A |  8880000001     | 50000.00
+  4.35s  A |  8880000002     | 50000.00
+  4.35s  A |  8880000003     | 50000.00
+  4.35s  A | (3 rows)
+  4.85s  -- (3) SAVEPOINT: a batch of 3 payments where payment #2 fails
+  4.85s  A >> BEGIN;
+  5.05s  A >> SAVEPOINT pay1;
+  5.16s  A >> SELECT transfer_funds('8880000001', '8880000003', 1000, 'WEB', 'P3 demo batch #1');
+  5.16s  A |  transfer_funds
+  5.16s  A | ----------------
+  5.16s  A |          519329
+  5.16s  A | (1 row)
+  5.46s  A >> SAVEPOINT pay2;
+  5.56s  A >> SELECT transfer_funds('8880000001', '0000000000', 1000, 'WEB', 'P3 demo batch #2 bad account');
+  5.57s  A | ERROR:  Unknown account number
+  5.87s  A >> ROLLBACK TO SAVEPOINT pay2;
+  6.07s  A >> SAVEPOINT pay3;
+  6.17s  A >> SELECT transfer_funds('8880000001', '8880000003', 3000, 'WEB', 'P3 demo batch #3');
+  6.18s  A |  transfer_funds
+  6.18s  A | ----------------
+  6.18s  A |          519330
+  6.18s  A | (1 row)
+  6.48s  A >> COMMIT;
+  6.78s  A >> SELECT account_number, balance FROM account WHERE account_number IN ('8880000001','8880000002','8880000003') ORDER BY 1;
+  6.78s  A |  account_number | balance
+  6.78s  A | ----------------+----------
+  6.78s  A |  8880000001     | 46000.00
+  6.78s  A |  8880000002     | 50000.00
+  6.78s  A |  8880000003     | 54000.00
+  6.78s  A | (3 rows)

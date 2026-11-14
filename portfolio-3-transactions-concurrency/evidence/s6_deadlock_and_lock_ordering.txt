@@ -1,0 +1,59 @@
+SCENARIO: CONCURRENCY CONTROL: deadlock detection, and prevention by lock ordering
+==============================================================================
+Part 1: naive transfer code debits the source first. A sends Ada->Bayo while B
+sends Bayo->Ada at the same time. A locks Ada and waits for Bayo; B locks Bayo
+and waits for Ada. This is a cycle in the wait-for graph. PostgreSQL's
+deadlock detector (after deadlock_timeout = 1s) aborts one victim. Part 2: the
+same two transfers through transfer_funds(), which always locks the lower
+account_id first. B simply waits, then both succeed, with no deadlock.
+
+Timeline (seconds since start | session | '>>' = statement sent, otherwise = server output)
+------------------------------------------------------------------------------
+  0.00s  -- --- Part 1: naive ordering -> DEADLOCK ---
+  0.31s  A >> BEGIN;
+  0.72s  B >> BEGIN;
+  0.92s  A >> UPDATE account SET balance = balance - 1000 WHERE account_number = '8880000001';  -- debit Ada
+  1.23s  B >> UPDATE account SET balance = balance - 2000 WHERE account_number = '8880000003';  -- debit Bayo
+  1.53s  A >> UPDATE account SET balance = balance + 1000 WHERE account_number = '8880000003';  -- credit Bayo (waits for B)
+  1.93s  B >> UPDATE account SET balance = balance + 2000 WHERE account_number = '8880000001';  -- credit Ada (cycle!)
+  2.53s  A | ERROR:  deadlock detected
+  3.73s  A >> COMMIT;
+  4.04s  B >> ROLLBACK;
+  4.65s  C >> SELECT datname, deadlocks FROM pg_stat_database WHERE datname = current_database();
+  4.66s  C |   datname  | deadlocks
+  4.66s  C | -----------+-----------
+  4.66s  C |  kobotrust |         1
+  4.66s  C | (1 row)
+  5.05s  -- --- Part 2: transfer_funds() locks rows in account_id order -> NO deadlock ---
+  5.05s  A >> BEGIN;
+  5.16s  B >> BEGIN;
+  5.36s  A >> SELECT transfer_funds('8880000001', '8880000003', 1000, 'WEB', 'P3 demo order A');
+  5.37s  A |  transfer_funds
+  5.37s  A | ----------------
+  5.37s  A |          519347
+  5.37s  A | (1 row)
+  5.67s  B >> SELECT transfer_funds('8880000003', '8880000001', 2000, 'WEB', 'P3 demo order B');
+  6.27s  C >> SELECT application_name, wait_event_type, wait_event FROM pg_stat_activity WHERE application_name IN ('session_A','session_B') ORDER BY 1;
+  6.27s  C |  application_name | wait_event_type |  wait_event
+  6.27s  C | ------------------+-----------------+---------------
+  6.27s  C |  session_A        | Client          | ClientRead
+  6.27s  C |  session_B        | Lock            | transactionid
+  6.27s  C | (2 rows)
+  6.77s  A >> COMMIT;
+  6.78s  B |  transfer_funds
+  6.78s  B | ----------------
+  6.78s  B |          519348
+  6.78s  B | (1 row)
+  7.28s  B >> COMMIT;
+  7.68s  C >> SELECT datname, deadlocks FROM pg_stat_database WHERE datname = current_database();
+  7.68s  C |   datname  | deadlocks
+  7.68s  C | -----------+-----------
+  7.68s  C |  kobotrust |         1
+  7.68s  C | (1 row)
+  7.98s  C >> SELECT account_number, balance FROM account WHERE account_number IN ('8880000001','8880000002','8880000003') ORDER BY 1;
+  7.99s  C |  account_number | balance
+  7.99s  C | ----------------+----------
+  7.99s  C |  8880000001     | 51000.00
+  7.99s  C |  8880000002     | 50000.00
+  7.99s  C |  8880000003     | 49000.00
+  7.99s  C | (3 rows)
