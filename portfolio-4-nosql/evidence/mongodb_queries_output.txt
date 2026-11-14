@@ -1,0 +1,361 @@
+
+=== D1 customer profile with embedded accounts and beneficiaries ===
+[
+  {
+    _id: 2,
+    kyc: {
+      tier: 1,
+      dailyLimit: 50000
+    },
+    name: {
+      last: 'Udeh',
+      first: 'Chiamaka'
+    },
+    accounts: [
+      {
+        type: 'SAVINGS',
+        currency: 'NGN',
+        accountNumber: '1000000027'
+      },
+      {
+        type: 'KIDDIES',
+        currency: 'NGN',
+        accountNumber: '1000000028'
+      }
+    ],
+    beneficiaries: []
+  }
+]
+
+=== D2 home screen balances ===
+[
+  {
+    _id: '1000055147',
+    type: 'SAVINGS',
+    status: 'ACTIVE',
+    balance: Decimal128('4502340.84')
+  },
+  {
+    _id: '1000055148',
+    type: 'KIDDIES',
+    status: 'ACTIVE',
+    balance: Decimal128('3978454.69')
+  }
+]
+
+=== D3 statement bucket (summary) ===
+null
+
+=== D4 last 5 transactions touching account 1000000027 ===
+[
+  {
+    _id: 'b5c6f395-eed7-4759-be16-953426bec1ab',
+    type: 'TRANSFER',
+    amount: Decimal128('367.75'),
+    channel: 'MOBILE',
+    createdAt: ISODate('2026-10-17T12:38:29.103Z'),
+    narration: 'Transport'
+  },
+  {
+    _id: '061cbfaf-a747-4ddc-8ee5-44615c0c106b',
+    type: 'TRANSFER',
+    amount: Decimal128('101.17'),
+    channel: 'MOBILE',
+    createdAt: ISODate('2026-10-08T05:22:35.961Z'),
+    narration: 'Gift'
+  },
+  {
+    _id: '74196546-5016-49a4-8a6c-215999c71a8f',
+    type: 'TRANSFER',
+    amount: Decimal128('819.02'),
+    channel: 'MOBILE',
+    createdAt: ISODate('2026-09-10T18:33:06.864Z'),
+    narration: 'School fees'
+  },
+  {
+    _id: 'd1b4dba7-f72e-45d8-9680-113d07af31a4',
+    type: 'TRANSFER',
+    amount: Decimal128('123931.36'),
+    channel: 'WEB',
+    createdAt: ISODate('2026-08-30T18:30:01.749Z'),
+    narration: 'Gift'
+  },
+  {
+    _id: 'e3d4ad80-9ac0-464b-a306-01195258a0e2',
+    type: 'TRANSFER',
+    amount: Decimal128('284.95'),
+    channel: 'MOBILE',
+    createdAt: ISODate('2026-08-21T06:23:16.104Z'),
+    narration: 'Food stuff'
+  }
+]
+
+=== D5 failed transactions by channel (24-31 Oct 2026) ===
+[
+  {
+    _id: 'MOBILE',
+    failed: 156,
+    value: Decimal128('5016754.30')
+  },
+  {
+    _id: 'POS',
+    failed: 55,
+    value: Decimal128('1883300.63')
+  },
+  {
+    _id: 'WEB',
+    failed: 54,
+    value: Decimal128('1711714.88')
+  },
+  {
+    _id: 'USSD',
+    failed: 47,
+    value: Decimal128('1272253.10')
+  },
+  {
+    _id: 'ATM',
+    failed: 5,
+    value: Decimal128('241000.00')
+  },
+  {
+    _id: 'BRANCH',
+    failed: 3,
+    value: Decimal128('41000.00')
+  }
+]
+
+=== D6 2026 successful transfer volume by month and channel ===
+[
+  {
+    _id: {
+      month: '2026-01',
+      channel: 'MOBILE'
+    },
+    txns: 12817,
+    value: Decimal128('392151978.58')
+  },
+  {
+    _id: {
+      month: '2026-01',
+      channel: 'POS'
+    },
+    txns: 4322,
+    value: Decimal128('135791948.78')
+  },
+  {
+    _id: {
+      month: '2026-01',
+      channel: 'USSD'
+    },
+    txns: 4299,
+    value: Decimal128('132052147.60')
+  },
+  {
+    _id: {
+      month: '2026-01',
+      channel: 'WEB'
+    },
+    txns: 4247,
+    value: Decimal128('125752685.68')
+  },
+  {
+    _id: {
+      month: '2026-02',
+      channel: 'MOBILE'
+    },
+    txns: 11696,
+    value: Decimal128('338914594.18')
+  },
+  {
+    _id: {
+      month: '2026-02',
+      channel: 'USSD'
+    },
+    txns: 3936,
+    value: Decimal128('118377730.78')
+  },
+  {
+    _id: {
+      month: '2026-02',
+      channel: 'POS'
+    },
+    txns: 3825,
+    value: Decimal128('117297075.90')
+  },
+  {
+    _id: {
+      month: '2026-02',
+      channel: 'WEB'
+    },
+    txns: 3936,
+    value: Decimal128('116621358.20')
+  },
+  {
+    _id: {
+      month: '2026-03',
+      channel: 'MOBILE'
+    },
+    txns: 12824,
+    value: Decimal128('383007393.66')
+  },
+  {
+    _id: {
+      month: '2026-03',
+      channel: 'USSD'
+    },
+    txns: 4285,
+    value: Decimal128('131507434.40')
+  },
+  {
+    _id: {
+      month: '2026-03',
+      channel: 'POS'
+    },
+    txns: 4299,
+    value: Decimal128('126530485.85')
+  },
+  {
+    _id: {
+      month: '2026-03',
+      channel: 'WEB'
+    },
+    txns: 4198,
+    value: Decimal128('125590809.33')
+  }
+]
+
+=== D7 top senders Oct 2026 with $lookup ===
+[
+  {
+    sent: Decimal128('391283.55'),
+    n: 5,
+    account: '1000061712',
+    customer: 'Segun Bello'
+  },
+  {
+    sent: Decimal128('385020.03'),
+    n: 3,
+    account: '1000211017',
+    customer: 'Folake Fashola'
+  },
+  {
+    sent: Decimal128('375461.58'),
+    n: 3,
+    account: '1000220273',
+    customer: 'Emeka Iyorchia'
+  },
+  {
+    sent: Decimal128('358269.68'),
+    n: 4,
+    account: '1000050272',
+    customer: 'Ibrahim Nwosu'
+  },
+  {
+    sent: Decimal128('339248.79'),
+    n: 4,
+    account: '1000213266',
+    customer: 'Musa Bello'
+  },
+  {
+    sent: Decimal128('337750.30'),
+    n: 4,
+    account: '1000249342',
+    customer: 'Hadiza Okonkwo'
+  },
+  {
+    sent: Decimal128('335919.58'),
+    n: 4,
+    account: '1000135019',
+    customer: 'Uche Fashola'
+  },
+  {
+    sent: Decimal128('322853.74'),
+    n: 4,
+    account: '1000199213',
+    customer: 'Tamuno Balogun'
+  },
+  {
+    sent: Decimal128('320846.96'),
+    n: 4,
+    account: '1000138685',
+    customer: 'Gbenga Okoro'
+  },
+  {
+    sent: Decimal128('312627.05'),
+    n: 5,
+    account: '1000124424',
+    customer: 'Ibrahim Udeh'
+  }
+]
+
+=== D8 velocity bursts in October 2026 ===
+[
+  {
+    _id: '1000007073',
+    bursts: 3,
+    first: ISODate('2026-10-06T01:03:45.000Z')
+  },
+  {
+    _id: '1000007554',
+    bursts: 3,
+    first: ISODate('2026-10-07T01:03:45.000Z')
+  },
+  {
+    _id: '1000008048',
+    bursts: 3,
+    first: ISODate('2026-10-08T01:03:45.000Z')
+  },
+  {
+    _id: '1000008529',
+    bursts: 3,
+    first: ISODate('2026-10-09T01:03:45.000Z')
+  },
+  {
+    _id: '1000009023',
+    bursts: 3,
+    first: ISODate('2026-10-10T01:03:45.000Z')
+  },
+  {
+    _id: '1000009985',
+    bursts: 3,
+    first: ISODate('2026-10-12T01:03:45.000Z')
+  },
+  {
+    _id: '1000010479',
+    bursts: 3,
+    first: ISODate('2026-10-13T01:03:45.000Z')
+  },
+  {
+    _id: '1000010960',
+    bursts: 3,
+    first: ISODate('2026-10-14T01:03:45.000Z')
+  },
+  {
+    _id: '1000011454',
+    bursts: 3,
+    first: ISODate('2026-10-15T01:03:45.000Z')
+  },
+  {
+    _id: '1000011935',
+    bursts: 3,
+    first: ISODate('2026-10-16T01:03:45.000Z')
+  },
+  {
+    _id: '1000012416',
+    bursts: 3,
+    first: ISODate('2026-10-17T01:03:45.000Z')
+  }
+]
+
+=== D9 validator rejects a bad document ===
+Rejected as expected: Document failed validation
+
+=== D10 explain(): D4 uses the multikey compound index ===
+{
+  winningStage: 'FETCH',
+  index: 'legs.account_1_createdAt_-1',
+  nReturned: 5,
+  totalKeysExamined: 5,
+  totalDocsExamined: 5,
+  ms: 0
+}

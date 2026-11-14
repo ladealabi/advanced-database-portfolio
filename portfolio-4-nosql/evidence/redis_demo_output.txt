@@ -1,0 +1,113 @@
+Redis server: redis_version:8.0.1
+
+=== K1. Login session tokens with automatic expiry (SET ... EX) ===
+redis> SET session:bffde0343a398a4467f405dbd93e1d7b {"customerId":2,"device":"android","kycTier":1} EX 900
+OK
+redis> GET session:bffde0343a398a4467f405dbd93e1d7b
+"{\"customerId\":2,\"device\":\"android\",\"kycTier\":1}"
+redis> TTL session:bffde0343a398a4467f405dbd93e1d7b
+(integer) 900
+
+=== K2. Idempotency keys: block duplicate transfer requests (SET NX) ===
+redis> SET idem:txn-ref-1794491118 processing NX EX 86400
+OK
+redis> SET idem:txn-ref-1794491118 processing NX EX 86400
+(nil)
+-> second SET returned (nil), so the duplicate is rejected before it reaches PostgreSQL
+
+=== K3. Per-customer daily transfer limit counter (INCRBYFLOAT + EXPIREAT) ===
+request N40000 -> allowed(1=yes,0=no) used_today: 1 40000 
+request N40000 -> allowed(1=yes,0=no) used_today: 0 40000 
+redis> TTL limit:cust:88800000001:2026-11-12
+(integer) 33282
+
+=== K4. OTP brute-force protection / rate limiting (INCR + EXPIRE) ===
+attempt 1: wrong OTP, failures=1
+attempt 2: wrong OTP, failures=2
+attempt 3: wrong OTP, failures=3
+attempt 4: BLOCKED (failures=4 in 5 min)
+
+=== K5. Cache-aside for the balance screen (HASH) loaded from PostgreSQL ===
+redis> HSET acct:1000000027 type SAVINGS balance 840752.04 status ACTIVE
+(integer) 3
+redis> EXPIRE acct:1000000027 30
+(integer) 1
+redis> HGETALL acct:1000000027
+1) "type"
+2) "SAVINGS"
+3) "balance"
+4) "840752.04"
+5) "status"
+6) "ACTIVE"
+-> on every successful transfer the app runs DEL acct:<number> (invalidate), so the cache is never stale for long
+
+=== K6. Real-time leaderboard: top receiving accounts in Oct 2026 (SORTED SET) ===
+redis> ZCARD lb:credits:2026-10
+(integer) 15649
+redis> ZREVRANGE lb:credits:2026-10 0 4 WITHSCORES
+ 1) "1000101427"
+ 2) "41801515"
+ 3) "1000022712"
+ 4) "39894952"
+ 5) "1000177126"
+ 6) "39863283"
+ 7) "1000190126"
+ 8) "39391033"
+ 9) "1000110657"
+10) "37953795"
+redis> ZREVRANK lb:credits:2026-10 1000000027
+(integer) 13549
+-> each new credit is ONE ZINCRBY (O(log N)); the ranking is always current with no GROUP BY
+
+=== K7. Transaction notifications with a Stream + consumer group (XADD / XREADGROUP) ===
+redis> XADD txn:events * ref txn-ref-1794491118 account 1000000027 dir D amount 2500 channel MOBILE
+"1794491120573-0"
+redis> XADD txn:events * ref txn-ref-1794491118-2 account 1000000040 dir C amount 2500 channel MOBILE
+"1794491120582-0"
+redis> XGROUP CREATE txn:events sms-service 0
+OK
+redis> XREADGROUP GROUP sms-service worker-1 COUNT 10 STREAMS txn:events >
+1) 1) "txn:events"
+   2) 1) 1) "1794491120573-0"
+         2)  1) "ref"
+             2) "txn-ref-1794491118"
+             3) "account"
+             4) "1000000027"
+             5) "dir"
+             6) "D"
+             7) "amount"
+             8) "2500"
+             9) "channel"
+            10) "MOBILE"
+      2) 1) "1794491120582-0"
+         2)  1) "ref"
+             2) "txn-ref-1794491118-2"
+             3) "account"
+             4) "1000000040"
+             5) "dir"
+             6) "C"
+             7) "amount"
+             8) "2500"
+             9) "channel"
+            10) "MOBILE"
+redis> XPENDING txn:events sms-service
+1) (integer) 2
+2) "1794491120573-0"
+3) "1794491120582-0"
+4) 1) 1) "worker-1"
+      2) "2"
+
+=== K8. Latency: Redis GET vs PostgreSQL primary-key lookup ===
+redis-benchmark (20 clients, 100k requests):
+SET: 83194.67 requests per second, p50=0.119 msec
+GET: 89365.51 requests per second, p50=0.119 msec
+pgbench: PostgreSQL lookup by account_number (unique B-tree), 20 clients, 100k queries:
+latency average = 0.378 ms
+tps = 52870.078655 (without initial connection time)
+
+=== Keyspace summary ===
+redis> INFO keyspace
+# Keyspace
+db0:keys=8,expires=5,avg_ttl=34037298,subexpiry=0
+redis> DBSIZE
+(integer) 8

@@ -1,0 +1,48 @@
+Before:
+[
+  {
+    _id: '1000000027',
+    balance: Decimal128('840752.04')
+  },
+  {
+    _id: '1000000040',
+    balance: Decimal128('4526960.63')
+  }
+]
+COMMITTED demo-ok-1794656707710: 1000000027 -> 1000000040  N2500.00
+After successful transfer:
+[
+  {
+    _id: '1000000027',
+    balance: Decimal128('838252.04')
+  },
+  {
+    _id: '1000000040',
+    balance: Decimal128('4529460.63')
+  }
+]
+ROLLED BACK demo-fail-1794656707770: Insufficient funds or inactive source account 1000000027
+After failed transfer (unchanged, because the whole transaction rolled back):
+[
+  {
+    _id: '1000000027',
+    balance: Decimal128('838252.04')
+  },
+  {
+    _id: '1000000040',
+    balance: Decimal128('4529460.63')
+  }
+]
+COMMITTED demo-dup-1794656707792: 1000000027 -> 1000000040  N100.00
+ROLLED BACK demo-dup-1794656707792: E11000 duplicate key error collection: kobotrust.transactions index: _id_ dup key: { _id: "demo-dup-1794656707792" }
+After duplicate retry (debited only once):
+[
+  {
+    _id: '1000000027',
+    balance: Decimal128('838152.04')
+  },
+  {
+    _id: '1000000040',
+    balance: Decimal128('4529560.63')
+  }
+]

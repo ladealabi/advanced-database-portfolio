@@ -1,0 +1,27 @@
+Graph built in 1.11s: 24,073 account nodes, 49,647 SENT_TO edges (Sep-Oct 2026)
+
+=== G1. Round-tripping: directed cycles of length 3-5 ===
+searched 7 repeated-transfer edges (use --full for every edge): found 1 cycle(s) in 0.2s.
+A cycle traversed REPEATEDLY (laps = min transfers on any edge) is the round-tripping signature,
+so cycles are ranked by laps, then by value. Chance cycles (each edge used once) rank as low.
+  [HIGH RISK] laps=3  1000092158 -> 1000092171 -> 1000092184 -> 1000092197 -> 1000092210 -> 1000092158  | N1,395,000.00
+
+=== G2. PageRank (weighted by amount): where does money converge? ===
+  1000011155  pagerank=0.000527  in_degree=  7  received=N170,294.00
+  1000205674  pagerank=0.000460  in_degree=  3  received=N180,447.34
+  1000256660  pagerank=0.000434  in_degree=  3  received=N125,462.70
+  1000172434  pagerank=0.000432  in_degree=  5  received=N351,143.43
+  1000160590  pagerank=0.000423  in_degree=  5  received=N304,472.59
+  1000006501  pagerank=0.000407  in_degree=  4  received=N318,399.98
+  1000036206  pagerank=0.000407  in_degree=  7  received=N321,879.61
+  1000161578  pagerank=0.000404  in_degree=  5  received=N206,626.74
+
+=== G3. Fan-out (one account paying many) / fan-in (many paying one) ===
+  top fan-out: 1000229269 (10), 1000002419 (9), 1000234495 (9), 1000196015 (9), 1000166818 (9)
+  top fan-in: 1000142910 (11), 1000140076 (9), 1000221560 (9), 1000013963 (9), 1000022322 (9)
+
+=== G4. Shortest money path between two accounts (degrees of separation) ===
+  1000092158 -> 1000092210: 1000092158 -> 1000092171 -> 1000092184 -> 1000092197 -> 1000092210
+  largest connected component: 24,036 of 24,073 accounts (99.8%) are linked by some chain of transfers
+
+Exported neo4j_accounts.csv and neo4j_sent_to.csv for `neo4j-admin database import`
