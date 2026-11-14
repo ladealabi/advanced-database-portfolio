@@ -1,0 +1,25 @@
+-- Q6_last_txn_per_account_correlated
+SELECT a.account_number,
+       (SELECT max(le.created_at) FROM ledger_entry le WHERE le.account_id = a.account_id) AS last_activity
+FROM account a
+WHERE a.branch_id = 3 AND a.account_id % 50 = 0;
+
+ account_number | last_activity 
+----------------+---------------
+ 1000005176     | 
+ 1000012976     | 
+ 1000020776     | 
+ 1000028576     | 
+ 1000036376     | 
+ 1000044176     | 
+ 1000051976     | 
+ 1000059776     | 
+ 1000067576     | 
+ 1000075376     | 
+ 1000083176     | 
+ 1000090976     | 
+ 1000098776     | 
+ 1000106576     | 
+ 1000114376     | 
+(15 rows)
+

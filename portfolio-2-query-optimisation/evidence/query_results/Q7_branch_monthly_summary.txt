@@ -1,0 +1,31 @@
+-- Q7_branch_monthly_summary
+SELECT b.branch_code, date_trunc('month', le.created_at)::date AS month,
+       sum(le.amount) FILTER (WHERE le.direction = 'C') AS inflow,
+       sum(le.amount) FILTER (WHERE le.direction = 'D') AS outflow,
+       count(*) AS postings
+FROM ledger_entry le
+JOIN account a ON a.account_id = le.account_id
+JOIN branch  b ON b.branch_id  = a.branch_id
+WHERE le.created_at >= '2026-01-01' AND le.created_at < '2027-01-01' AND a.type_code <> 'GL'
+GROUP BY b.branch_code, month
+ORDER BY b.branch_code, month;
+
+ branch_code |   month    |   inflow    |   outflow   | postings 
+-------------+------------+-------------+-------------+----------
+ EDO01       | 2026-01-01 | 52253023.63 | 60295498.83 |     3796
+ EDO01       | 2026-02-01 | 49287380.82 | 53850503.03 |     3428
+ EDO01       | 2026-03-01 | 49457801.50 | 56229633.55 |     3722
+ EDO01       | 2026-04-01 | 50885845.17 | 58485753.76 |     3739
+ EDO01       | 2026-05-01 | 51116965.85 | 57763933.01 |     3724
+ EDO01       | 2026-06-01 | 48976688.49 | 59567790.65 |     3624
+ EDO01       | 2026-07-01 | 49513350.88 | 58655211.94 |     3753
+ EDO01       | 2026-08-01 | 51819713.23 | 54676993.82 |     3697
+ EDO01       | 2026-09-01 | 49293593.86 | 52272849.47 |     3532
+ EDO01       | 2026-10-01 | 49096508.22 | 60069037.38 |     3633
+ ENU01       | 2026-01-01 | 53534474.64 | 60593781.46 |     3844
+ ENU01       | 2026-02-01 | 48826080.43 | 53044652.90 |     3432
+ ENU01       | 2026-03-01 | 49951768.23 | 55640670.53 |     3565
+ ENU01       | 2026-04-01 | 48928339.99 | 57905433.76 |     3650
+ ENU01       | 2026-05-01 | 53971583.58 | 58392176.05 |     3859
+(15 rows)
+

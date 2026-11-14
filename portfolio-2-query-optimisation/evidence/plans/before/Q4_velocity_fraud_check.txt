@@ -1,0 +1,51 @@
+-- Q4_velocity_fraud_check (before)
+WITH debits AS (
+    SELECT account_id, created_at,
+           lag(created_at, 2) OVER (PARTITION BY account_id ORDER BY created_at) AS two_before
+    FROM ledger_entry
+    WHERE direction = 'D' AND account_id <> 1
+      AND created_at >= '2026-10-01' AND created_at < '2026-11-01')
+SELECT account_id, count(*) AS bursts, min(created_at) AS first_burst
+FROM debits
+WHERE created_at - two_before <= INTERVAL '10 minutes'
+GROUP BY account_id
+ORDER BY bursts DESC, account_id
+LIMIT 20;
+
+                                                                                                                     QUERY PLAN                                                                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=32809.37..32809.42 rows=20 width=20) (actual time=77.888..78.563 rows=11 loops=1)
+   Buffers: shared hit=11324 read=7148 written=55
+   ->  Sort  (cost=32809.37..32830.73 rows=8543 width=20) (actual time=77.887..78.560 rows=11 loops=1)
+         Sort Key: (count(*)) DESC, debits.account_id
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=11324 read=7148 written=55
+         ->  GroupAggregate  (cost=28539.10..32582.04 rows=8543 width=20) (actual time=57.904..78.540 rows=11 loops=1)
+               Group Key: debits.account_id
+               Buffers: shared hit=11321 read=7148 written=55
+               ->  Subquery Scan on debits  (cost=28539.10..32431.29 rows=8709 width=12) (actual time=57.839..78.502 rows=33 loops=1)
+                     Filter: ((debits.created_at - debits.two_before) <= '00:10:00'::interval)
+                     Rows Removed by Filter: 29277
+                     Buffers: shared hit=11321 read=7148 written=55
+                     ->  WindowAgg  (cost=28539.10..32039.37 rows=26128 width=20) (actual time=57.368..76.299 rows=29310 loops=1)
+                           Buffers: shared hit=11321 read=7148 written=55
+                           ->  Gather Merge  (cost=28539.10..31582.13 rows=26128 width=12) (actual time=57.347..63.386 rows=29310 loops=1)
+                                 Workers Planned: 2
+                                 Workers Launched: 2
+                                 Buffers: shared hit=11321 read=7148 written=55
+                                 ->  Sort  (cost=27539.07..27566.29 rows=10887 width=12) (actual time=54.066..54.695 rows=9770 loops=3)
+                                       Sort Key: ledger_entry.account_id, ledger_entry.created_at
+                                       Sort Method: quicksort  Memory: 782kB
+                                       Buffers: shared hit=11321 read=7148 written=55
+                                       Worker 0:  Sort Method: quicksort  Memory: 763kB
+                                       Worker 1:  Sort Method: quicksort  Memory: 754kB
+                                       ->  Parallel Seq Scan on ledger_entry  (cost=0.00..26809.08 rows=10887 width=12) (actual time=0.015..51.705 rows=9770 loops=3)
+                                             Filter: ((account_id <> 1) AND (created_at >= '2026-10-01 00:00:00+01'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+01'::timestamp with time zone) AND (direction = 'D'::bpchar))
+                                             Rows Removed by Filter: 327353
+                                             Buffers: shared hit=11233 read=7148 written=55
+ Planning:
+   Buffers: shared hit=118
+ Planning Time: 0.668 ms
+ Execution Time: 78.679 ms
+(33 rows)
+

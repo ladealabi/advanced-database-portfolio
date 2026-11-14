@@ -1,0 +1,54 @@
+-- Q6_last_txn_per_account_rewritten (after)
+SELECT a.account_number, x.last_activity
+FROM account a
+LEFT JOIN (SELECT le.account_id, max(le.created_at) AS last_activity
+           FROM ledger_entry le
+           JOIN account a2 ON a2.account_id = le.account_id
+                          AND a2.branch_id = 3 AND a2.account_id % 50 = 0
+           GROUP BY le.account_id) x ON x.account_id = a.account_id
+WHERE a.branch_id = 3 AND a.account_id % 50 = 0;
+
+                                                                                  QUERY PLAN                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Hash Left Join  (cost=884.22..1564.61 rows=17 width=19) (actual time=4.199..4.753 rows=134 loops=1)
+   Hash Cond: (a.account_id = x.account_id)
+   Buffers: shared hit=1297
+   ->  Bitmap Heap Scan on account a  (cost=41.30..721.64 rows=17 width=15) (actual time=0.271..0.789 rows=134 loops=1)
+         Recheck Cond: (branch_id = 3)
+         Filter: ((account_id % 50) = 0)
+         Rows Removed by Filter: 3200
+         Heap Blocks: exact=433
+         Buffers: shared hit=441
+         ->  Bitmap Index Scan on idx_account_branch  (cost=0.00..41.29 rows=3334 width=0) (actual time=0.127..0.127 rows=3334 loops=1)
+               Index Cond: (branch_id = 3)
+               Buffers: shared hit=8
+   ->  Hash  (cost=835.76..835.76 rows=573 width=12) (actual time=3.915..3.916 rows=101 loops=1)
+         Buckets: 1024  Batches: 1  Memory Usage: 13kB
+         Buffers: shared hit=856
+         ->  Subquery Scan on x  (cost=824.30..835.76 rows=573 width=12) (actual time=3.859..3.885 rows=101 loops=1)
+               Buffers: shared hit=856
+               ->  HashAggregate  (cost=824.30..830.03 rows=573 width=12) (actual time=3.858..3.874 rows=101 loops=1)
+                     Group Key: le.account_id
+                     Batches: 1  Memory Usage: 49kB
+                     Buffers: shared hit=856
+                     ->  Nested Loop  (cost=41.72..821.44 rows=573 width=12) (actual time=0.957..3.526 rows=2544 loops=1)
+                           Buffers: shared hit=856
+                           ->  Bitmap Heap Scan on account a2  (cost=41.30..721.64 rows=17 width=4) (actual time=0.130..2.103 rows=134 loops=1)
+                                 Recheck Cond: (branch_id = 3)
+                                 Filter: ((account_id % 50) = 0)
+                                 Rows Removed by Filter: 3200
+                                 Heap Blocks: exact=433
+                                 Buffers: shared hit=438
+                                 ->  Bitmap Index Scan on idx_account_branch  (cost=0.00..41.29 rows=3334 width=0) (actual time=0.088..0.088 rows=3334 loops=1)
+                                       Index Cond: (branch_id = 3)
+                                       Buffers: shared hit=5
+                           ->  Index Only Scan using idx_ledger_acct_time on ledger_entry le  (cost=0.42..5.43 rows=44 width=12) (actual time=0.006..0.008 rows=19 loops=134)
+                                 Index Cond: (account_id = a2.account_id)
+                                 Heap Fetches: 0
+                                 Buffers: shared hit=418
+ Planning:
+   Buffers: shared hit=313
+ Planning Time: 1.610 ms
+ Execution Time: 4.914 ms
+(40 rows)
+

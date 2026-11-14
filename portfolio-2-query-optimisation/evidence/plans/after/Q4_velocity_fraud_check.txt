@@ -1,0 +1,42 @@
+-- Q4_velocity_fraud_check (after)
+WITH debits AS (
+    SELECT account_id, created_at,
+           lag(created_at, 2) OVER (PARTITION BY account_id ORDER BY created_at) AS two_before
+    FROM ledger_entry
+    WHERE direction = 'D' AND account_id <> 1
+      AND created_at >= '2026-10-01' AND created_at < '2026-11-01')
+SELECT account_id, count(*) AS bursts, min(created_at) AS first_burst
+FROM debits
+WHERE created_at - two_before <= INTERVAL '10 minutes'
+GROUP BY account_id
+ORDER BY bursts DESC, account_id
+LIMIT 20;
+
+                                                                                        QUERY PLAN                                                                                         
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=14527.24..14527.29 rows=20 width=20) (actual time=32.211..32.216 rows=11 loops=1)
+   Buffers: shared hit=1947
+   ->  Sort  (cost=14527.24..14549.26 rows=8807 width=20) (actual time=32.211..32.212 rows=11 loops=1)
+         Sort Key: (count(*)) DESC, debits.account_id
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=1947
+         ->  GroupAggregate  (cost=0.42..14292.89 rows=8807 width=20) (actual time=1.605..32.185 rows=11 loops=1)
+               Group Key: debits.account_id
+               Buffers: shared hit=1941
+               ->  Subquery Scan on debits  (cost=0.42..14136.52 rows=9107 width=12) (actual time=1.543..32.171 rows=33 loops=1)
+                     Filter: ((debits.created_at - debits.two_before) <= '00:10:00'::interval)
+                     Rows Removed by Filter: 29277
+                     Buffers: shared hit=1941
+                     ->  WindowAgg  (cost=0.42..13726.69 rows=27322 width=20) (actual time=0.837..30.137 rows=29310 loops=1)
+                           Buffers: shared hit=1941
+                           ->  Index Only Scan using idx_ledger_debits_acct_time on ledger_entry  (cost=0.42..13248.56 rows=27322 width=12) (actual time=0.823..17.265 rows=29310 loops=1)
+                                 Index Cond: ((created_at >= '2026-10-01 00:00:00+01'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+01'::timestamp with time zone))
+                                 Filter: (account_id <> 1)
+                                 Heap Fetches: 0
+                                 Buffers: shared hit=1941
+ Planning:
+   Buffers: shared hit=186
+ Planning Time: 0.878 ms
+ Execution Time: 32.306 ms
+(24 rows)
+

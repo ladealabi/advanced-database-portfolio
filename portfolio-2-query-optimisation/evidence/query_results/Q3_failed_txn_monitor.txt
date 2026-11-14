@@ -1,0 +1,18 @@
+-- Q3_failed_txn_monitor
+SELECT channel, count(*) AS failed, sum(amount) AS value_ngn
+FROM txn
+WHERE status = 'FAILED'
+  AND created_at >= TIMESTAMPTZ '2026-10-24' AND created_at < TIMESTAMPTZ '2026-11-01'
+GROUP BY channel
+ORDER BY failed DESC;
+
+ channel | failed | value_ngn  
+---------+--------+------------
+ MOBILE  |    156 | 5016754.30
+ POS     |     56 | 1890939.49
+ WEB     |     55 | 1712062.18
+ USSD    |     47 | 1272253.10
+ ATM     |      5 |  241000.00
+ BRANCH  |      3 |   41000.00
+(6 rows)
+

@@ -1,0 +1,26 @@
+-- Q1_account_statement (after)
+SELECT le.created_at, t.txn_ref, t.txn_type, t.channel, t.narration,
+       CASE le.direction WHEN 'D' THEN -le.amount ELSE le.amount END AS signed_amount,
+       le.balance_after
+FROM ledger_entry le
+JOIN txn t ON t.txn_id = le.txn_id
+WHERE le.account_id = 2
+  AND le.created_at >= '2026-01-01' AND le.created_at < '2026-07-01'
+ORDER BY le.created_at, le.entry_id;
+
+                                                                                     QUERY PLAN                                                                                      
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop  (cost=0.85..178.40 rows=14 width=99) (actual time=0.083..0.273 rows=11 loops=1)
+   Buffers: shared hit=57
+   ->  Index Scan using idx_ledger_acct_time on ledger_entry le  (cost=0.42..60.17 rows=14 width=42) (actual time=0.039..0.079 rows=11 loops=1)
+         Index Cond: ((account_id = 2) AND (created_at >= '2026-01-01 00:00:00+01'::timestamp with time zone) AND (created_at < '2026-07-01 00:00:00+01'::timestamp with time zone))
+         Buffers: shared hit=13
+   ->  Index Scan using txn_pkey on txn t  (cost=0.42..8.44 rows=1 width=50) (actual time=0.014..0.014 rows=1 loops=11)
+         Index Cond: (txn_id = le.txn_id)
+         Buffers: shared hit=44
+ Planning:
+   Buffers: shared hit=291
+ Planning Time: 2.115 ms
+ Execution Time: 0.372 ms
+(12 rows)
+

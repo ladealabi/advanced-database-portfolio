@@ -1,0 +1,11 @@
+-- Q8_customer_accounts_home
+SELECT account_number, type_code, balance
+FROM account
+WHERE customer_id = 4242;
+
+ account_number | type_code |  balance   
+----------------+-----------+------------
+ 1000055147     | SAVINGS   | 4502340.84
+ 1000055148     | KIDDIES   | 3978454.69
+(2 rows)
+

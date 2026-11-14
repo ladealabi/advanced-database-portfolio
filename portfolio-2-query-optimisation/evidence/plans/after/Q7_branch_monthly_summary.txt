@@ -1,0 +1,49 @@
+-- Q7_branch_monthly_summary (after)
+SELECT b.branch_code, date_trunc('month', le.created_at)::date AS month,
+       sum(le.amount) FILTER (WHERE le.direction = 'C') AS inflow,
+       sum(le.amount) FILTER (WHERE le.direction = 'D') AS outflow,
+       count(*) AS postings
+FROM ledger_entry le
+JOIN account a ON a.account_id = le.account_id
+JOIN branch  b ON b.branch_id  = a.branch_id
+WHERE le.created_at >= '2026-01-01' AND le.created_at < '2027-01-01' AND a.type_code <> 'GL'
+GROUP BY b.branch_code, month
+ORDER BY b.branch_code, month;
+
+                                                                                  QUERY PLAN                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=110766.67..134543.11 rows=594411 width=82) (actual time=794.054..1016.189 rows=120 loops=1)
+   Group Key: b.branch_code, ((date_trunc('month'::text, le.created_at))::date)
+   Buffers: shared hit=13200 read=5810, temp read=2140 written=2149
+   ->  Sort  (cost=110766.67..112252.70 rows=594411 width=19) (actual time=792.447..892.701 rows=549354 loops=1)
+         Sort Key: b.branch_code, ((date_trunc('month'::text, le.created_at))::date)
+         Sort Method: external merge  Disk: 17120kB
+         Buffers: shared hit=13200 read=5810, temp read=2140 written=2149
+         ->  Hash Join  (cost=1373.28..41568.89 rows=594411 width=19) (actual time=10.376..498.817 rows=549354 loops=1)
+               Hash Cond: (a.branch_id = b.branch_id)
+               Buffers: shared hit=13194 read=5810
+               ->  Hash Join  (cost=1372.01..36484.17 rows=594411 width=19) (actual time=10.331..307.330 rows=549354 loops=1)
+                     Hash Cond: (le.account_id = a.account_id)
+                     Buffers: shared hit=13193 read=5810
+                     ->  Seq Scan on ledger_entry le  (cost=0.00..33551.55 rows=594431 width=21) (actual time=0.011..170.355 rows=592598 loops=1)
+                           Filter: ((created_at >= '2026-01-01 00:00:00+01'::timestamp with time zone) AND (created_at < '2027-01-01 00:00:00+01'::timestamp with time zone))
+                           Rows Removed by Filter: 418772
+                           Buffers: shared hit=12571 read=5810
+                     ->  Hash  (cost=997.01..997.01 rows=30000 width=6) (actual time=10.199..10.199 rows=30000 loops=1)
+                           Buckets: 32768  Batches: 1  Memory Usage: 1370kB
+                           Buffers: shared hit=622
+                           ->  Seq Scan on account a  (cost=0.00..997.01 rows=30000 width=6) (actual time=0.009..6.153 rows=30000 loops=1)
+                                 Filter: ((type_code)::text <> 'GL'::text)
+                                 Rows Removed by Filter: 1
+                                 Buffers: shared hit=622
+               ->  Hash  (cost=1.12..1.12 rows=12 width=8) (actual time=0.021..0.022 rows=12 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                     Buffers: shared hit=1
+                     ->  Seq Scan on branch b  (cost=0.00..1.12 rows=12 width=8) (actual time=0.008..0.009 rows=12 loops=1)
+                           Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=541
+ Planning Time: 1.904 ms
+ Execution Time: 1018.085 ms
+(33 rows)
+

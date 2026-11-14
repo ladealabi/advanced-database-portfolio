@@ -1,0 +1,17 @@
+-- Q8_customer_accounts_home (after)
+SELECT account_number, type_code, balance
+FROM account
+WHERE customer_id = 4242;
+
+                                                                QUERY PLAN                                                                
+------------------------------------------------------------------------------------------------------------------------------------------
+ Index Only Scan using idx_account_customer_cover on account  (cost=0.29..8.30 rows=1 width=26) (actual time=0.049..0.052 rows=2 loops=1)
+   Index Cond: (customer_id = 4242)
+   Heap Fetches: 0
+   Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=134
+ Planning Time: 0.638 ms
+ Execution Time: 0.120 ms
+(8 rows)
+

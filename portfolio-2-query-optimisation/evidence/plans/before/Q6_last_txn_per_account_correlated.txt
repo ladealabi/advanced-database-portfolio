@@ -1,0 +1,25 @@
+-- Q6_last_txn_per_account_correlated (before)
+SELECT a.account_number,
+       (SELECT max(le.created_at) FROM ledger_entry le WHERE le.account_id = a.account_id) AS last_activity
+FROM account a
+WHERE a.branch_id = 3 AND a.account_id % 50 = 0;
+
+                                                           QUERY PLAN                                                            
+---------------------------------------------------------------------------------------------------------------------------------
+ Seq Scan on account a  (cost=0.00..528542.14 rows=17 width=19) (actual time=119.584..11010.015 rows=134 loops=1)
+   Filter: ((branch_id = 3) AND ((account_id % 50) = 0))
+   Rows Removed by Filter: 29867
+   Buffers: shared hit=1634484 read=829192
+   SubPlan 1
+     ->  Aggregate  (cost=31023.23..31023.24 rows=1 width=8) (actual time=82.122..82.123 rows=1 loops=134)
+           Buffers: shared hit=1633862 read=829192
+           ->  Seq Scan on ledger_entry le  (cost=0.00..31023.12 rows=43 width=8) (actual time=31.671..82.110 rows=19 loops=134)
+                 Filter: (account_id = a.account_id)
+                 Rows Removed by Filter: 1011351
+                 Buffers: shared hit=1633862 read=829192
+ Planning:
+   Buffers: shared hit=162
+ Planning Time: 0.768 ms
+ Execution Time: 11010.202 ms
+(15 rows)
+

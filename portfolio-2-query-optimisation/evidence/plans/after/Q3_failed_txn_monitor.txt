@@ -1,0 +1,27 @@
+-- Q3_failed_txn_monitor (after)
+SELECT channel, count(*) AS failed, sum(amount) AS value_ngn
+FROM txn
+WHERE status = 'FAILED'
+  AND created_at >= TIMESTAMPTZ '2026-10-24' AND created_at < TIMESTAMPTZ '2026-11-01'
+GROUP BY channel
+ORDER BY failed DESC;
+
+                                                                              QUERY PLAN                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=315.00..315.02 rows=6 width=45) (actual time=0.585..0.587 rows=6 loops=1)
+   Sort Key: (count(*)) DESC
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=208
+   ->  HashAggregate  (cost=314.85..314.93 rows=6 width=45) (actual time=0.558..0.560 rows=6 loops=1)
+         Group Key: channel
+         Batches: 1  Memory Usage: 24kB
+         Buffers: shared hit=205
+         ->  Index Scan using idx_txn_failed_time on txn  (cost=0.29..313.47 rows=184 width=12) (actual time=0.033..0.461 rows=322 loops=1)
+               Index Cond: ((created_at >= '2026-10-24 00:00:00+01'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+01'::timestamp with time zone))
+               Buffers: shared hit=205
+ Planning:
+   Buffers: shared hit=170
+ Planning Time: 0.692 ms
+ Execution Time: 0.662 ms
+(15 rows)
+

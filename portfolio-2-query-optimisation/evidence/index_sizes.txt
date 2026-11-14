@@ -1,0 +1,22 @@
+            index            |  size   |  bytes   
+-----------------------------+---------+----------
+ ledger_entry_pkey           | 44 MB   | 45899776
+ idx_ledger_acct_time        | 39 MB   | 41041920
+ idx_ledger_txn              | 32 MB   | 33587200
+ txn_txn_ref_key             | 19 MB   | 20299776
+ idx_ledger_debits_acct_time | 15 MB   | 15974400
+ txn_pkey                    | 11 MB   | 11681792
+ account_account_number_key  | 1864 kB |  1908736
+ idx_account_customer_cover  | 1464 kB |  1499136
+ account_pkey                | 1336 kB |  1368064
+ idx_account_customer        | 1336 kB |  1368064
+ customer_email_key          | 1216 kB |  1245184
+ idx_customer_email_lower    | 992 kB  |  1015808
+ customer_phone_key          | 752 kB  |   770048
+ customer_bvn_key            | 632 kB  |   647168
+ customer_pkey               | 456 kB  |   466944
+ idx_txn_failed_time         | 312 kB  |   319488
+ idx_account_branch          | 224 kB  |   229376
+ idx_ledger_created_brin     | 32 kB   |    32768
+(18 rows)
+

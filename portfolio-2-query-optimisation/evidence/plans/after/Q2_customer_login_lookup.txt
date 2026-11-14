@@ -1,0 +1,16 @@
+-- Q2_customer_login_lookup (after)
+SELECT customer_id, first_name, last_name, kyc_tier, status
+FROM customer
+WHERE lower(email) = lower('Chiamaka.Udeh1@Yahoo.com');
+
+                                                             QUERY PLAN                                                             
+------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using idx_customer_email_lower on customer  (cost=0.29..8.30 rows=1 width=26) (actual time=0.033..0.035 rows=1 loops=1)
+   Index Cond: (lower((email)::text) = 'chiamaka.udeh1@yahoo.com'::text)
+   Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=138
+ Planning Time: 0.726 ms
+ Execution Time: 0.065 ms
+(7 rows)
+

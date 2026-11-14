@@ -1,0 +1,22 @@
+-- Q7_branch_monthly_from_mv (after)
+SELECT branch_code, month, inflow, outflow, postings
+FROM mv_branch_monthly
+WHERE month >= '2026-01-01' AND month < '2027-01-01'
+ORDER BY branch_code, month;
+
+                                                      QUERY PLAN                                                      
+----------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=10.13..10.14 rows=2 width=100) (actual time=0.184..0.192 rows=120 loops=1)
+   Sort Key: branch_code, month
+   Sort Method: quicksort  Memory: 32kB
+   Buffers: shared hit=10
+   ->  Seq Scan on mv_branch_monthly  (cost=0.00..10.12 rows=2 width=100) (actual time=0.013..0.058 rows=120 loops=1)
+         Filter: ((month >= '2026-01-01'::date) AND (month < '2027-01-01'::date))
+         Rows Removed by Filter: 288
+         Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=88
+ Planning Time: 0.419 ms
+ Execution Time: 0.235 ms
+(12 rows)
+

@@ -1,0 +1,38 @@
+-- Q5_dormant_accounts (before)
+SELECT a.account_number, a.type_code, a.balance
+FROM account a
+WHERE a.status = 'ACTIVE' AND a.type_code IN ('SAVINGS','CURRENT')
+  AND NOT EXISTS (SELECT 1 FROM ledger_entry le
+                  WHERE le.account_id = a.account_id AND le.direction = 'D'
+                    AND le.created_at >= TIMESTAMPTZ '2026-08-02')
+ORDER BY a.balance DESC
+LIMIT 50;
+
+                                                               QUERY PLAN                                                                
+-----------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=36110.47..36110.59 rows=50 width=26) (actual time=174.812..174.825 rows=50 loops=1)
+   Buffers: shared hit=12562 read=6444
+   ->  Sort  (cost=36110.47..36123.43 rows=5186 width=26) (actual time=174.811..174.817 rows=50 loops=1)
+         Sort Key: a.balance DESC
+         Sort Method: top-N heapsort  Memory: 30kB
+         Buffers: shared hit=12562 read=6444
+         ->  Hash Right Anti Join  (cost=1380.66..35938.19 rows=5186 width=26) (actual time=174.011..174.561 rows=886 loops=1)
+               Hash Cond: (le.account_id = a.account_id)
+               Buffers: shared hit=12559 read=6444
+               ->  Seq Scan on ledger_entry le  (cost=0.00..33551.55 rows=88140 width=4) (actual time=0.021..142.195 rows=87650 loops=1)
+                     Filter: ((created_at >= '2026-08-02 00:00:00+01'::timestamp with time zone) AND (direction = 'D'::bpchar))
+                     Rows Removed by Filter: 923720
+                     Buffers: shared hit=11937 read=6444
+               ->  Hash  (cost=1072.01..1072.01 rows=24692 width=30) (actual time=13.496..13.497 rows=24692 loops=1)
+                     Buckets: 32768  Batches: 1  Memory Usage: 1800kB
+                     Buffers: shared hit=622
+                     ->  Seq Scan on account a  (cost=0.00..1072.01 rows=24692 width=30) (actual time=0.013..8.349 rows=24692 loops=1)
+                           Filter: (((type_code)::text = ANY ('{SAVINGS,CURRENT}'::text[])) AND ((status)::text = 'ACTIVE'::text))
+                           Rows Removed by Filter: 5309
+                           Buffers: shared hit=622
+ Planning:
+   Buffers: shared hit=336
+ Planning Time: 1.053 ms
+ Execution Time: 175.083 ms
+(24 rows)
+

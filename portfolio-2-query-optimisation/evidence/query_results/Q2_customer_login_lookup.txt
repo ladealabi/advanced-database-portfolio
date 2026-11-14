@@ -1,0 +1,10 @@
+-- Q2_customer_login_lookup
+SELECT customer_id, first_name, last_name, kyc_tier, status
+FROM customer
+WHERE lower(email) = lower('Chiamaka.Udeh1@Yahoo.com');
+
+ customer_id | first_name | last_name | kyc_tier | status 
+-------------+------------+-----------+----------+--------
+           2 | Chiamaka   | Udeh      |        1 | ACTIVE
+(1 row)
+

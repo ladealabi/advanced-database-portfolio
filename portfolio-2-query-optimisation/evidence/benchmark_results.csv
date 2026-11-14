@@ -1,0 +1,19 @@
+query,phase,median_exec_ms,median_plan_ms,shared_buffers_touched,top_node,plan_nodes
+Q1_account_statement,before,56.62,0.992,18459,Gather Merge,"Gather Merge, Index Scan, Nested Loop, Seq Scan, Sort"
+Q2_customer_login_lookup,before,12.964,0.611,392,Seq Scan,Seq Scan
+Q3_failed_txn_monitor,before,30.46,0.61,7992,Sort,"Aggregate, Gather Merge, Seq Scan, Sort"
+Q4_velocity_fraud_check,before,79.129,0.613,18472,Limit,"Aggregate, Gather Merge, Limit, Seq Scan, Sort, Subquery Scan, WindowAgg"
+Q5_dormant_accounts,before,174.174,1.074,19006,Limit,"Hash, Hash Join, Limit, Seq Scan, Sort"
+Q6_last_txn_per_account_correlated,before,10837.079,0.871,2463676,Seq Scan,"Aggregate, Seq Scan"
+Q7_branch_monthly_summary,before,1011.256,1.309,19010,Aggregate,"Aggregate, Hash, Hash Join, Seq Scan, Sort"
+Q8_customer_accounts_home,before,0.098,0.591,4,Index Scan,Index Scan
+Q1_account_statement,after,0.291,1.348,57,Nested Loop,"Index Scan, Nested Loop"
+Q2_customer_login_lookup,after,0.068,0.737,3,Index Scan,Index Scan
+Q3_failed_txn_monitor,after,0.708,0.704,208,Sort,"Aggregate, Index Scan, Sort"
+Q4_velocity_fraud_check,after,32.558,0.894,1947,Limit,"Aggregate, Index Only Scan, Limit, Sort, Subquery Scan, WindowAgg"
+Q5_dormant_accounts,after,46.655,1.503,2566,Limit,"Hash, Hash Join, Index Only Scan, Limit, Seq Scan, Sort"
+Q6_last_txn_per_account_correlated,after,3.524,1.231,844,Bitmap Heap Scan,"Bitmap Heap Scan, Bitmap Index Scan, Index Only Scan, Limit, Result"
+Q7_branch_monthly_summary,after,1023.564,1.712,19010,Aggregate,"Aggregate, Hash, Hash Join, Seq Scan, Sort"
+Q8_customer_accounts_home,after,0.131,0.673,3,Index Only Scan,Index Only Scan
+Q6_last_txn_per_account_rewritten,after,4.957,1.438,1297,Hash Join,"Aggregate, Bitmap Heap Scan, Bitmap Index Scan, Hash, Hash Join, Index Only Scan, Nested Loop, Subquery Scan"
+Q7_branch_monthly_from_mv,after,0.254,0.461,10,Sort,"Seq Scan, Sort"

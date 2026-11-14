@@ -1,0 +1,17 @@
+-- Q2_customer_login_lookup (before)
+SELECT customer_id, first_name, last_name, kyc_tier, status
+FROM customer
+WHERE lower(email) = lower('Chiamaka.Udeh1@Yahoo.com');
+
+                                               QUERY PLAN                                               
+--------------------------------------------------------------------------------------------------------
+ Seq Scan on customer  (cost=0.00..692.01 rows=100 width=26) (actual time=0.016..12.847 rows=1 loops=1)
+   Filter: (lower((email)::text) = 'chiamaka.udeh1@yahoo.com'::text)
+   Rows Removed by Filter: 20000
+   Buffers: shared hit=392
+ Planning:
+   Buffers: shared hit=118
+ Planning Time: 0.567 ms
+ Execution Time: 12.878 ms
+(8 rows)
+

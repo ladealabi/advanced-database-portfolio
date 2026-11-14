@@ -1,0 +1,29 @@
+-- Q4_velocity_fraud_check
+WITH debits AS (
+    SELECT account_id, created_at,
+           lag(created_at, 2) OVER (PARTITION BY account_id ORDER BY created_at) AS two_before
+    FROM ledger_entry
+    WHERE direction = 'D' AND account_id <> 1
+      AND created_at >= '2026-10-01' AND created_at < '2026-11-01')
+SELECT account_id, count(*) AS bursts, min(created_at) AS first_burst
+FROM debits
+WHERE created_at - two_before <= INTERVAL '10 minutes'
+GROUP BY account_id
+ORDER BY bursts DESC, account_id
+LIMIT 20;
+
+ account_id | bursts |      first_burst       
+------------+--------+------------------------
+        544 |      3 | 2026-10-06 02:03:45+01
+        581 |      3 | 2026-10-07 02:03:45+01
+        619 |      3 | 2026-10-08 02:03:45+01
+        656 |      3 | 2026-10-09 02:03:45+01
+        694 |      3 | 2026-10-10 02:03:45+01
+        768 |      3 | 2026-10-12 02:03:45+01
+        806 |      3 | 2026-10-13 02:03:45+01
+        843 |      3 | 2026-10-14 02:03:45+01
+        881 |      3 | 2026-10-15 02:03:45+01
+        918 |      3 | 2026-10-16 02:03:45+01
+        955 |      3 | 2026-10-17 02:03:45+01
+(11 rows)
+

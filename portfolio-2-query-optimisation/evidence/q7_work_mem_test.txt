@@ -1,0 +1,79 @@
+SET
+===== work_mem = 4MB (default) =====
+SET
+                                                                                  QUERY PLAN                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=129251.21..157871.89 rows=715517 width=82) (actual time=1567.545..1841.629 rows=121 loops=1)
+   Group Key: b.branch_code, ((date_trunc('month'::text, le.created_at))::date)
+   Buffers: shared hit=11333 read=7929, temp read=2570 written=2581
+   ->  Sort  (cost=129251.21..131040.00 rows=715517 width=19) (actual time=1565.977..1689.329 rows=670435 loops=1)
+         Sort Key: b.branch_code, ((date_trunc('month'::text, le.created_at))::date)
+         Sort Method: external merge  Disk: 20560kB
+         Buffers: shared hit=11333 read=7929, temp read=2570 written=2581
+         ->  Hash Join  (cost=1627.86..44996.60 rows=715517 width=19) (actual time=11.564..1209.854 rows=670435 loops=1)
+               Hash Cond: (a.branch_id = b.branch_id)
+               Buffers: shared hit=11327 read=7929
+               ->  Hash Join  (cost=1626.59..38876.17 rows=715517 width=19) (actual time=11.467..940.026 rows=670435 loops=1)
+                     Hash Cond: (le.account_id = a.account_id)
+                     Buffers: shared hit=11326 read=7929
+                     ->  Seq Scan on ledger_entry le  (cost=0.00..35371.02 rows=715541 width=21) (actual time=0.016..744.945 rows=713896 loops=1)
+                           Filter: ((created_at >= '2026-01-01 00:00:00+01'::timestamp with time zone) AND (created_at < '2027-01-01 00:00:00+01'::timestamp with time zone))
+                           Rows Removed by Filter: 418772
+                           Buffers: shared hit=10452 read=7929
+                     ->  Hash  (cost=1250.30..1250.30 rows=30103 width=6) (actual time=11.324..11.325 rows=30103 loops=1)
+                           Buckets: 32768  Batches: 1  Memory Usage: 1374kB
+                           Buffers: shared hit=874
+                           ->  Seq Scan on account a  (cost=0.00..1250.30 rows=30103 width=6) (actual time=0.014..6.828 rows=30103 loops=1)
+                                 Filter: ((type_code)::text <> 'GL'::text)
+                                 Rows Removed by Filter: 1
+                                 Buffers: shared hit=874
+               ->  Hash  (cost=1.12..1.12 rows=12 width=8) (actual time=0.039..0.040 rows=12 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                     Buffers: shared hit=1
+                     ->  Seq Scan on branch b  (cost=0.00..1.12 rows=12 width=8) (actual time=0.025..0.027 rows=12 loops=1)
+                           Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=541
+ Planning Time: 2.489 ms
+ Execution Time: 1845.637 ms
+(33 rows)
+
+===== work_mem = 64MB =====
+SET
+                                                                                  QUERY PLAN                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=114575.71..143196.39 rows=715517 width=82) (actual time=983.820..1220.862 rows=121 loops=1)
+   Group Key: b.branch_code, ((date_trunc('month'::text, le.created_at))::date)
+   Buffers: shared hit=11359 read=7897
+   ->  Sort  (cost=114575.71..116364.50 rows=715517 width=19) (actual time=982.428..1056.213 rows=670435 loops=1)
+         Sort Key: b.branch_code, ((date_trunc('month'::text, le.created_at))::date)
+         Sort Method: quicksort  Memory: 53272kB
+         Buffers: shared hit=11359 read=7897
+         ->  Hash Join  (cost=1627.86..44996.60 rows=715517 width=19) (actual time=8.492..613.926 rows=670435 loops=1)
+               Hash Cond: (a.branch_id = b.branch_id)
+               Buffers: shared hit=11359 read=7897
+               ->  Hash Join  (cost=1626.59..38876.17 rows=715517 width=19) (actual time=8.466..351.955 rows=670435 loops=1)
+                     Hash Cond: (le.account_id = a.account_id)
+                     Buffers: shared hit=11358 read=7897
+                     ->  Seq Scan on ledger_entry le  (cost=0.00..35371.02 rows=715541 width=21) (actual time=0.007..175.581 rows=713896 loops=1)
+                           Filter: ((created_at >= '2026-01-01 00:00:00+01'::timestamp with time zone) AND (created_at < '2027-01-01 00:00:00+01'::timestamp with time zone))
+                           Rows Removed by Filter: 418772
+                           Buffers: shared hit=10484 read=7897
+                     ->  Hash  (cost=1250.30..1250.30 rows=30103 width=6) (actual time=8.444..8.445 rows=30103 loops=1)
+                           Buckets: 32768  Batches: 1  Memory Usage: 1374kB
+                           Buffers: shared hit=874
+                           ->  Seq Scan on account a  (cost=0.00..1250.30 rows=30103 width=6) (actual time=0.005..4.463 rows=30103 loops=1)
+                                 Filter: ((type_code)::text <> 'GL'::text)
+                                 Rows Removed by Filter: 1
+                                 Buffers: shared hit=874
+               ->  Hash  (cost=1.12..1.12 rows=12 width=8) (actual time=0.014..0.014 rows=12 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                     Buffers: shared hit=1
+                     ->  Seq Scan on branch b  (cost=0.00..1.12 rows=12 width=8) (actual time=0.007..0.009 rows=12 loops=1)
+                           Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=20
+ Planning Time: 0.486 ms
+ Execution Time: 1228.197 ms
+(33 rows)
+

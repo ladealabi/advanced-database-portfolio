@@ -1,0 +1,37 @@
+-- Q1_account_statement (before)
+SELECT le.created_at, t.txn_ref, t.txn_type, t.channel, t.narration,
+       CASE le.direction WHEN 'D' THEN -le.amount ELSE le.amount END AS signed_amount,
+       le.balance_after
+FROM ledger_entry le
+JOIN txn t ON t.txn_id = le.txn_id
+WHERE le.account_id = 2
+  AND le.created_at >= '2026-01-01' AND le.created_at < '2026-07-01'
+ORDER BY le.created_at, le.entry_id;
+
+                                                                                         QUERY PLAN                                                                                          
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Gather Merge  (cost=26806.34..26807.74 rows=12 width=99) (actual time=55.831..58.984 rows=11 loops=1)
+   Workers Planned: 2
+   Workers Launched: 2
+   Buffers: shared hit=11244 read=7214
+   ->  Sort  (cost=25806.32..25806.34 rows=6 width=99) (actual time=52.370..52.371 rows=4 loops=3)
+         Sort Key: le.created_at, le.entry_id
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=11244 read=7214
+         Worker 0:  Sort Method: quicksort  Memory: 25kB
+         Worker 1:  Sort Method: quicksort  Memory: 25kB
+         ->  Nested Loop  (cost=0.42..25806.24 rows=6 width=99) (actual time=21.423..52.313 rows=4 loops=3)
+               Buffers: shared hit=11212 read=7214
+               ->  Parallel Seq Scan on ledger_entry le  (cost=0.00..25755.57 rows=6 width=42) (actual time=21.403..52.234 rows=4 loops=3)
+                     Filter: ((created_at >= '2026-01-01 00:00:00+01'::timestamp with time zone) AND (created_at < '2026-07-01 00:00:00+01'::timestamp with time zone) AND (account_id = 2))
+                     Rows Removed by Filter: 337120
+                     Buffers: shared hit=11167 read=7214
+               ->  Index Scan using txn_pkey on txn t  (cost=0.42..8.44 rows=1 width=50) (actual time=0.017..0.017 rows=1 loops=11)
+                     Index Cond: (txn_id = le.txn_id)
+                     Buffers: shared hit=45
+ Planning:
+   Buffers: shared hit=204
+ Planning Time: 0.997 ms
+ Execution Time: 59.120 ms
+(23 rows)
+

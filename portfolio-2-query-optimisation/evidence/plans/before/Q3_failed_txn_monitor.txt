@@ -1,0 +1,40 @@
+-- Q3_failed_txn_monitor (before)
+SELECT channel, count(*) AS failed, sum(amount) AS value_ngn
+FROM txn
+WHERE status = 'FAILED'
+  AND created_at >= TIMESTAMPTZ '2026-10-24' AND created_at < TIMESTAMPTZ '2026-11-01'
+GROUP BY channel
+ORDER BY failed DESC;
+
+                                                                                                        QUERY PLAN                                                                                                        
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=12706.19..12706.21 rows=6 width=45) (actual time=28.312..30.308 rows=6 loops=1)
+   Sort Key: (count(*)) DESC
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=3280 read=4712
+   ->  Finalize GroupAggregate  (cost=12703.60..12706.11 rows=6 width=45) (actual time=28.255..30.286 rows=6 loops=1)
+         Group Key: channel
+         Buffers: shared hit=3277 read=4712
+         ->  Gather Merge  (cost=12703.60..12705.92 rows=12 width=45) (actual time=28.238..30.262 rows=16 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=3277 read=4712
+               ->  Partial GroupAggregate  (cost=11703.57..11704.51 rows=6 width=45) (actual time=24.790..24.816 rows=5 loops=3)
+                     Group Key: channel
+                     Buffers: shared hit=3277 read=4712
+                     ->  Sort  (cost=11703.57..11703.79 rows=86 width=12) (actual time=24.765..24.771 rows=107 loops=3)
+                           Sort Key: channel
+                           Sort Method: quicksort  Memory: 29kB
+                           Buffers: shared hit=3277 read=4712
+                           Worker 0:  Sort Method: quicksort  Memory: 29kB
+                           Worker 1:  Sort Method: quicksort  Memory: 29kB
+                           ->  Parallel Seq Scan on txn  (cost=0.00..11700.81 rows=86 width=12) (actual time=20.755..24.616 rows=107 loops=3)
+                                 Filter: ((created_at >= '2026-10-24 00:00:00+01'::timestamp with time zone) AND (created_at < '2026-11-01 00:00:00+01'::timestamp with time zone) AND ((status)::text = 'FAILED'::text))
+                                 Rows Removed by Filter: 172958
+                                 Buffers: shared hit=3203 read=4712
+ Planning:
+   Buffers: shared hit=141
+ Planning Time: 0.592 ms
+ Execution Time: 30.408 ms
+(28 rows)
+

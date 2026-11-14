@@ -1,0 +1,25 @@
+-- Q1_account_statement
+SELECT le.created_at, t.txn_ref, t.txn_type, t.channel, t.narration,
+       CASE le.direction WHEN 'D' THEN -le.amount ELSE le.amount END AS signed_amount,
+       le.balance_after
+FROM ledger_entry le
+JOIN txn t ON t.txn_id = le.txn_id
+WHERE le.account_id = 2
+  AND le.created_at >= '2026-01-01' AND le.created_at < '2026-07-01'
+ORDER BY le.created_at, le.entry_id;
+
+          created_at           |               txn_ref                | txn_type | channel |  narration   | signed_amount | balance_after 
+-------------------------------+--------------------------------------+----------+---------+--------------+---------------+---------------
+ 2026-01-13 20:39:26.259829+01 | 5e904400-c806-4cd8-aa98-46efbfa5dff8 | TRANSFER | USSD    | School fees  |        231.96 |     955785.96
+ 2026-01-20 00:23:10.825537+01 | 0c8525cf-34ac-4c24-a15b-a251acade3f8 | TRANSFER | POS     | Data bundle  |      22315.07 |     978101.03
+ 2026-01-25 19:44:40.97393+01  | bf3eae4e-0127-44d4-9538-d091a21167a2 | TRANSFER | WEB     | Transport    |      36517.28 |    1014618.31
+ 2026-02-04 07:51:47.948596+01 | 19f698b4-52a0-4f73-a5e4-1292bb16465f | TRANSFER | MOBILE  | Transport    |        209.70 |    1014828.01
+ 2026-04-03 13:01:59.602058+01 | a8472468-7315-4caa-a803-b025e10a7fc8 | TRANSFER | MOBILE  | Gift         |       -469.49 |    1014358.52
+ 2026-04-20 03:00:53.406992+01 | ad24d685-2c68-4d2e-8718-2d0212971e5d | TRANSFER | MOBILE  | Contribution |      85018.12 |    1099376.64
+ 2026-05-06 02:34:56.610212+01 | a01cd2f2-5570-4374-aa1a-629ce2e580ff | TRANSFER | MOBILE  | Data bundle  |       -221.26 |    1099155.38
+ 2026-05-18 22:04:31.355529+01 | 4903aa54-5f93-48b2-8700-cb122d37be64 | TRANSFER | USSD    | Food stuff   |      -1048.58 |    1098106.80
+ 2026-06-08 17:30:58.247623+01 | 55d5d15f-8735-4900-965e-22d11ad9bcb2 | TRANSFER | MOBILE  | School fees  |     -56735.45 |    1041371.35
+ 2026-06-16 19:06:08.016064+01 | 7732e403-b2b0-41c6-8512-6b6c43abe3af | TRANSFER | WEB     | Transport    |        124.38 |    1041495.73
+ 2026-06-24 06:21:47.05836+01  | 765ba5b1-e44e-48c7-b0a2-adfe64459192 | TRANSFER | MOBILE  | Transport    |     -72221.88 |     969273.85
+(11 rows)
+

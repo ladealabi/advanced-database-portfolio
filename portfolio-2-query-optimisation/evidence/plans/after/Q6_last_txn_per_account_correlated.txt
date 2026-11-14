@@ -1,0 +1,33 @@
+-- Q6_last_txn_per_account_correlated (after)
+SELECT a.account_number,
+       (SELECT max(le.created_at) FROM ledger_entry le WHERE le.account_id = a.account_id) AS last_activity
+FROM account a
+WHERE a.branch_id = 3 AND a.account_id % 50 = 0;
+
+                                                                                 QUERY PLAN                                                                                  
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on account a  (cost=41.30..732.47 rows=17 width=19) (actual time=0.301..3.161 rows=134 loops=1)
+   Recheck Cond: (branch_id = 3)
+   Filter: ((account_id % 50) = 0)
+   Rows Removed by Filter: 3200
+   Heap Blocks: exact=433
+   Buffers: shared hit=844
+   ->  Bitmap Index Scan on idx_account_branch  (cost=0.00..41.29 rows=3334 width=0) (actual time=0.131..0.131 rows=3334 loops=1)
+         Index Cond: (branch_id = 3)
+         Buffers: shared hit=8
+   SubPlan 2
+     ->  Result  (cost=0.63..0.64 rows=1 width=8) (actual time=0.007..0.007 rows=1 loops=134)
+           Buffers: shared hit=403
+           InitPlan 1 (returns $1)
+             ->  Limit  (cost=0.42..0.63 rows=1 width=8) (actual time=0.007..0.007 rows=1 loops=134)
+                   Buffers: shared hit=403
+                   ->  Index Only Scan Backward using idx_ledger_acct_time on ledger_entry le  (cost=0.42..9.31 rows=44 width=8) (actual time=0.006..0.006 rows=1 loops=134)
+                         Index Cond: ((account_id = a.account_id) AND (created_at IS NOT NULL))
+                         Heap Fetches: 0
+                         Buffers: shared hit=403
+ Planning:
+   Buffers: shared hit=274
+ Planning Time: 1.160 ms
+ Execution Time: 3.261 ms
+(23 rows)
+
