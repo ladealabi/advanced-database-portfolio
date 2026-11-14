@@ -1,0 +1,50 @@
+SET
+
+[T1] PRIMARY KEY / UNIQUE: duplicate BVN (candidate key)
+psql:portfolio-1-database-design/sql/04_constraint_tests.sql:13: ERROR:  duplicate key value violates unique constraint "customer_bvn_key"
+
+[T2] DOMAIN CHECK: NUBAN must be exactly 10 digits
+psql:portfolio-1-database-design/sql/04_constraint_tests.sql:16: ERROR:  value for domain nuban violates check constraint "nuban_check"
+
+[T3] FOREIGN KEY: account for a customer that does not exist
+psql:portfolio-1-database-design/sql/04_constraint_tests.sql:19: ERROR:  insert or update on table "account" violates foreign key constraint "account_customer_id_fkey"
+
+[T4] CHECK: no overdraft (balance >= 0)
+psql:portfolio-1-database-design/sql/04_constraint_tests.sql:22: ERROR:  new row for relation "account" violates check constraint "chk_no_overdraft"
+
+[T5] CHECK: customer must be an adult
+psql:portfolio-1-database-design/sql/04_constraint_tests.sql:26: ERROR:  new row for relation "customer" violates check constraint "chk_adult"
+
+[T6] CHECK: phone must be +234 followed by 10 digits
+psql:portfolio-1-database-design/sql/04_constraint_tests.sql:30: ERROR:  new row for relation "customer" violates check constraint "customer_phone_check"
+
+[T7] CHECK: REVERSAL txn must reference the original (and only reversals may)
+psql:portfolio-1-database-design/sql/04_constraint_tests.sql:33: ERROR:  new row for relation "txn" violates check constraint "chk_reversal"
+
+[T8] FK ON DELETE RESTRICT: cannot delete a customer who still has accounts
+psql:portfolio-1-database-design/sql/04_constraint_tests.sql:36: ERROR:  update or delete on table "customer" violates foreign key constraint "account_customer_id_fkey" on table "account"
+
+[T9] DEFERRED CONSTRAINT TRIGGER: unbalanced double-entry is rejected at COMMIT
+BEGIN
+INSERT 0 1
+INSERT 0 1
+   ...insert accepted so far (check is deferred); now COMMIT:
+psql:portfolio-1-database-design/sql/04_constraint_tests.sql:44: ERROR:  Ledger imbalance for txn 579874: debits - credits = 500.00
+
+[T10] Business rule in transfer_funds(): insufficient funds
+psql:portfolio-1-database-design/sql/04_constraint_tests.sql:47: ERROR:  Insufficient funds: balance 840752.04, amount 999999999, minimum balance 1000.00
+
+[T11] Valid transfer succeeds and is audited
+BEGIN
+ new_txn_id 
+------------
+     579875
+(1 row)
+
+ audit_id | table_name | operation | row_pk | old_balance | new_balance 
+----------+------------+-----------+--------+-------------+-------------
+   188589 | account    | U         | 3      | 4526960.63  | 4529460.63
+   188588 | account    | U         | 2      | 840752.04   | 838252.04
+(2 rows)
+
+ROLLBACK

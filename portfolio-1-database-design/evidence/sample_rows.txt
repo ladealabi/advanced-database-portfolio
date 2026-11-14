@@ -1,0 +1,12 @@
+ customer_id | customer_name  | kyc_tier | account_number | type_code | currency |  balance   | status |  branch_name  |     city      
+-------------+----------------+----------+----------------+-----------+----------+------------+--------+---------------+---------------
+           2 | Chiamaka Udeh  |        1 | 1000000027     | SAVINGS   | NGN      |  840752.04 | ACTIVE | Lekki Phase 1 | Lagos
+           2 | Chiamaka Udeh  |        1 | 1000000028     | KIDDIES   | NGN      | 2181787.65 | ACTIVE | Lekki Phase 1 | Lagos
+           3 | Hadiza Adebayo |        2 | 1000000040     | CURRENT   | NGN      | 4526960.63 | ACTIVE | Ring Road     | Ibadan
+           4 | Kelechi Akande |        2 | 1000000053     | SAVINGS   | NGN      | 2432508.17 | ACTIVE | Trans-Amadi   | Port Harcourt
+           4 | Kelechi Akande |        2 | 1000000054     | SAVINGS   | NGN      |  695090.00 | ACTIVE | Trans-Amadi   | Port Harcourt
+           5 | Adaeze Okoro   |        2 | 1000000066     | SAVINGS   | NGN      | 3161139.32 | ACTIVE | Ogui Road     | Enugu
+           6 | Ngozi Umar     |        3 | 1000000079     | SAVINGS   | NGN      |  713708.13 | ACTIVE | Ring Road     | Benin City
+           6 | Ngozi Umar     |        3 | 1000000080     | DOMUSD    | USD      |       0.00 | ACTIVE | Ring Road     | Benin City
+(8 rows)
+

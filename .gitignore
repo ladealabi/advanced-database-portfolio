@@ -1,0 +1,9 @@
+# generated MongoDB export (~600 MB): regenerate with portfolio-4-nosql/mongodb/export_from_postgres.sh
+portfolio-4-nosql/mongodb/data/
+__pycache__/
+*.pyc
+.DS_Store
+dump.rdb
+*.bak
+*.bak2
+*.bak3

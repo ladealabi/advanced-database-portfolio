@@ -1,0 +1,69 @@
+                                       List of relations
+ Schema |     Name     | Type  |  Owner   | Persistence | Access method |  Size   | Description 
+--------+--------------+-------+----------+-------------+---------------+---------+-------------
+ bank   | account      | table | postgres | permanent   | heap          | 7032 kB | 
+ bank   | account_type | table | postgres | permanent   | heap          | 48 kB   | 
+ bank   | audit_log    | table | postgres | permanent   | heap          | 105 MB  | 
+ bank   | beneficiary  | table | postgres | permanent   | heap          | 1376 kB | 
+ bank   | branch       | table | postgres | permanent   | heap          | 40 kB   | 
+ bank   | customer     | table | postgres | permanent   | heap          | 3176 kB | 
+ bank   | employee     | table | postgres | permanent   | heap          | 48 kB   | 
+ bank   | ledger_entry | table | postgres | permanent   | heap          | 144 MB  | 
+ bank   | txn          | table | postgres | permanent   | heap          | 68 MB   | 
+(9 rows)
+
+                                      Table "bank.account"
+     Column     |           Type           | Collation | Nullable |           Default            
+----------------+--------------------------+-----------+----------+------------------------------
+ account_id     | integer                  |           | not null | generated always as identity
+ account_number | bank.nuban               |           | not null | 
+ customer_id    | integer                  |           | not null | 
+ branch_id      | smallint                 |           | not null | 
+ type_code      | character varying(10)    |           | not null | 
+ currency       | character(3)             |           | not null | 'NGN'::bpchar
+ balance        | bank.money_ngn           |           | not null | 0
+ status         | character varying(10)    |           | not null | 'ACTIVE'::character varying
+ opened_at      | timestamp with time zone |           | not null | now()
+Indexes:
+    "account_pkey" PRIMARY KEY, btree (account_id)
+    "account_account_number_key" UNIQUE CONSTRAINT, btree (account_number)
+    "idx_account_branch" btree (branch_id)
+    "idx_account_customer" btree (customer_id)
+    "idx_account_customer_cover" btree (customer_id) INCLUDE (account_number, type_code, balance)
+Check constraints:
+    "account_currency_check" CHECK (currency = ANY (ARRAY['NGN'::bpchar, 'USD'::bpchar, 'GBP'::bpchar]))
+    "account_status_check" CHECK (status::text = ANY (ARRAY['ACTIVE'::character varying, 'DORMANT'::character varying, 'FROZEN'::character varying, 'CLOSED'::character varying]::text[]))
+    "chk_no_overdraft" CHECK (balance::numeric >= 0::numeric)
+Foreign-key constraints:
+    "account_branch_id_fkey" FOREIGN KEY (branch_id) REFERENCES bank.branch(branch_id)
+    "account_customer_id_fkey" FOREIGN KEY (customer_id) REFERENCES bank.customer(customer_id) ON DELETE RESTRICT
+    "account_type_code_fkey" FOREIGN KEY (type_code) REFERENCES bank.account_type(type_code)
+Referenced by:
+    TABLE "bank.ledger_entry" CONSTRAINT "ledger_entry_account_id_fkey" FOREIGN KEY (account_id) REFERENCES bank.account(account_id)
+Triggers:
+    account_audit AFTER INSERT OR DELETE OR UPDATE ON bank.account FOR EACH ROW EXECUTE FUNCTION bank.trg_audit_account()
+
+                                   Table "bank.ledger_entry"
+    Column     |           Type           | Collation | Nullable |           Default            
+---------------+--------------------------+-----------+----------+------------------------------
+ entry_id      | bigint                   |           | not null | generated always as identity
+ txn_id        | bigint                   |           | not null | 
+ account_id    | integer                  |           | not null | 
+ direction     | character(1)             |           | not null | 
+ amount        | bank.positive_amount     |           | not null | 
+ balance_after | bank.money_ngn           |           | not null | 
+ created_at    | timestamp with time zone |           | not null | clock_timestamp()
+Indexes:
+    "ledger_entry_pkey" PRIMARY KEY, btree (entry_id)
+    "idx_ledger_acct_time" btree (account_id, created_at, entry_id)
+    "idx_ledger_created_brin" brin (created_at) WITH (pages_per_range='32')
+    "idx_ledger_debits_acct_time" btree (account_id, created_at) WHERE direction = 'D'::bpchar
+    "idx_ledger_txn" btree (txn_id)
+Check constraints:
+    "ledger_entry_direction_check" CHECK (direction = ANY (ARRAY['D'::bpchar, 'C'::bpchar]))
+Foreign-key constraints:
+    "ledger_entry_account_id_fkey" FOREIGN KEY (account_id) REFERENCES bank.account(account_id)
+    "ledger_entry_txn_id_fkey" FOREIGN KEY (txn_id) REFERENCES bank.txn(txn_id)
+Triggers:
+    ledger_balanced AFTER INSERT ON bank.ledger_entry DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION bank.trg_check_txn_balanced()
+

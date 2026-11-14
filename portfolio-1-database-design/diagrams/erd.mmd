@@ -1,0 +1,103 @@
+erDiagram
+    BRANCH ||--o{ EMPLOYEE : "employs"
+    BRANCH ||--o{ ACCOUNT : "domiciles"
+    EMPLOYEE |o--o{ EMPLOYEE : "manages"
+    CUSTOMER ||--|{ ACCOUNT : "owns"
+    CUSTOMER ||--o{ BENEFICIARY : "saves"
+    ACCOUNT_TYPE ||--o{ ACCOUNT : "classifies"
+    ACCOUNT ||--o{ LEDGER_ENTRY : "is posted to"
+    TXN ||--|{ LEDGER_ENTRY : "is recorded as (>=2 legs)"
+    TXN |o--o| TXN : "reverses"
+    EMPLOYEE |o--o{ TXN : "initiates (branch txns)"
+    ACCOUNT ||..o{ AUDIT_LOG : "audited by trigger (logical, no FK)"
+
+    BRANCH {
+        smallint branch_id PK
+        char5 branch_code UK
+        varchar branch_name
+        varchar city
+        varchar state
+        varchar region "SOUTH | NORTH"
+        date opened_on
+    }
+    EMPLOYEE {
+        int employee_id PK
+        smallint branch_id FK
+        int manager_id FK "self"
+        varchar first_name
+        varchar last_name
+        varchar email UK
+        varchar job_role
+        date hired_on
+    }
+    CUSTOMER {
+        int customer_id PK
+        char11 bvn UK
+        varchar first_name
+        varchar last_name
+        varchar email UK
+        varchar phone UK
+        date date_of_birth
+        varchar address_line
+        varchar city
+        varchar state
+        smallint kyc_tier "1..3"
+        varchar status
+        timestamptz created_at
+    }
+    ACCOUNT_TYPE {
+        varchar type_code PK
+        varchar description
+        numeric min_balance
+        numeric daily_debit_limit
+        numeric annual_interest_pct
+    }
+    ACCOUNT {
+        int account_id PK
+        char10 account_number UK "NUBAN"
+        int customer_id FK
+        smallint branch_id FK
+        varchar type_code FK
+        char3 currency
+        numeric balance "CHECK >= 0"
+        varchar status
+        timestamptz opened_at
+    }
+    BENEFICIARY {
+        int customer_id PK, FK
+        char3 bank_code PK
+        char10 beneficiary_account PK
+        varchar nickname
+        timestamptz added_at
+    }
+    TXN {
+        bigint txn_id PK
+        uuid txn_ref UK "idempotency key"
+        varchar txn_type
+        varchar channel
+        varchar status
+        numeric amount "CHECK > 0"
+        varchar narration
+        bigint reversal_of FK "self"
+        int initiated_by_employee FK
+        timestamptz created_at
+    }
+    LEDGER_ENTRY {
+        bigint entry_id PK
+        bigint txn_id FK
+        int account_id FK
+        char1 direction "D | C"
+        numeric amount
+        numeric balance_after
+        timestamptz created_at
+    }
+    AUDIT_LOG {
+        bigint audit_id PK
+        text table_name
+        char1 operation
+        text row_pk
+        jsonb old_data
+        jsonb new_data
+        text changed_by
+        timestamptz changed_at
+    }

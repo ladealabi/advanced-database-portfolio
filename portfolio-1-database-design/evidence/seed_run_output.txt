@@ -1,0 +1,65 @@
+SET
+ setseed 
+---------
+ 
+(1 row)
+
+INSERT 0 12
+INSERT 0 5
+SELECT 50
+SELECT 40
+INSERT 0 12
+INSERT 0 108
+INSERT 0 1
+INSERT 0 20000
+INSERT 0 1
+INSERT 0 30000
+UPDATE 309
+UPDATE 60
+INSERT 0 20001
+ALTER TABLE
+ALTER TABLE
+INSERT 0 27500
+SELECT 24692
+CREATE INDEX
+SELECT 420000
+DELETE 20
+INSERT 0 60
+INSERT 0 15
+ALTER TABLE
+INSERT 0 420055
+INSERT 0 70000
+INSERT 0 55000
+INSERT 0 822926
+INSERT 0 140000
+INSERT 0 1662
+INSERT 0 3324
+ALTER TABLE
+psql:sql/02_seed_data.sql:262: NOTICE:  pass 1: 4902 overdrawing txns declined
+psql:sql/02_seed_data.sql:262: NOTICE:  pass 2: 18 overdrawing txns declined
+DO
+UPDATE 1011370
+UPDATE 27501
+ALTER TABLE
+ALTER TABLE
+ANALYZE
+--- Integrity checks (all should be 0) ---
+                 check                  | count 
+----------------------------------------+-------
+ negative running balances              |     0
+ account.balance <> last ledger balance |     0
+ unbalanced txns                        |     0
+(3 rows)
+
+--- Row counts ---
+      t       |  count  
+--------------+---------
+ branch       |      12
+ employee     |     120
+ beneficiary  |   20001
+ customer     |   20001
+ account      |   30001
+ txn          |  519197
+ ledger_entry | 1011370
+(7 rows)
+
