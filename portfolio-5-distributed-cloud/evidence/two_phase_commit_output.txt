@@ -1,0 +1,52 @@
+
+==================== Before ====================
+  SOUTH 1000000027 = 840752.04   |   NORTH 1000000092 = 1264095.52
+
+==================== A. Happy path: both shards vote YES, then COMMIT PREPARED ====================
+global transaction id: be3df35c-1dc4-4fc2-b832-e3a9234190de
+phase 1 / SOUTH:
+phase 1 / NORTH:
+in-doubt transactions waiting for the decision:
+                 gid                  |           prepared            |    database     
+--------------------------------------+-------------------------------+-----------------
+ be3df35c-1dc4-4fc2-b832-e3a9234190de | 2026-11-14 12:33:38.179354+01 | kobotrust_south
+(1 row)
+
+                 gid                  |          prepared           |    database     
+--------------------------------------+-----------------------------+-----------------
+ be3df35c-1dc4-4fc2-b832-e3a9234190de | 2026-11-14 12:33:38.1953+01 | kobotrust_north
+(1 row)
+
+both voted YES, so phase 2: COMMIT PREPARED on both
+  SOUTH 1000000027 = 835752.04   |   NORTH 1000000092 = 1269095.52
+
+==================== B. A shard votes NO: the debit would overdraw, so PREPARE never happens and the global txn is ROLLED BACK ====================
+phase 1 / NORTH (credit first this time):
+phase 1 / SOUTH:
+  ERROR:  new row for relation "account" violates check constraint "account_balance_check"
+  DETAIL:  Failing row contains (1000000027, 2, SOUTH, LAG03, SAVINGS, -999164246.96, ACTIVE).
+SOUTH voted NO, so the coordinator sends ROLLBACK PREPARED to every shard that voted YES
+  SOUTH 1000000027 = 835752.04   |   NORTH 1000000092 = 1269095.52
+  (balances unchanged on BOTH shards: atomicity across servers)
+
+==================== C. Coordinator crashes AFTER phase 1 (the blocking weakness of 2PC) ====================
+both shards PREPARED... coordinator crashes before sending COMMIT. Some time later:
+                 gid                  |           prepared            
+--------------------------------------+-------------------------------
+ 01296ef4-5805-4996-993b-3a8a731553d1 | 2026-11-14 12:33:38.435144+01
+(1 row)
+
+the prepared txn still holds its row lock. A customer's normal debit on SOUTH now waits:
+  ERROR:  canceling statement due to lock timeout
+  CONTEXT:  while updating tuple (188,40) in relation "account"
+recovery: the coordinator restarts, reads its decision log (it had decided COMMIT), and finishes phase 2:
+ in_doubt_left 
+---------------
+             0
+(1 row)
+
+  SOUTH 1000000027 = 834752.04   |   NORTH 1000000092 = 1270095.52
+
+==================== Global invariant: SOUTH debits = NORTH credits for every 2PC transaction ====================
+SOUTH debit legs:        2, NORTH credit legs:        2
+MATCH: every cross-shard transfer is on both shards with the same amount

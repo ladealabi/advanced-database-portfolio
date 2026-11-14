@@ -1,0 +1,161 @@
+SET
+SET
+
+=== SH1. Data distribution across shards (shard key = region) ===
+  shard_partition   | accounts |    deposits    
+--------------------+----------+----------------
+ dist.account_south |    18437 | 42112142383.83
+ dist.account_north |    11666 | 27759231836.90
+
+  shard_partition  | ledger_rows 
+-------------------+-------------
+ dist.ledger_south |      451061
+ dist.ledger_north |      219374
+
+
+=== SH2. Single-shard query: the shard key is in WHERE, so the planner prunes the other shard ===
+                                                           QUERY PLAN                                                            
+---------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan on dist.account_north account
+   Output: account.account_number, account.balance
+   Remote SQL: SELECT account_number, balance FROM bank.account WHERE ((region = 'NORTH')) AND ((account_number = '1000000092'))
+
+ account_number | region |  balance   
+----------------+--------+------------
+ 1000000092     | NORTH  | 1264095.52
+
+
+=== SH3. No shard key: SCATTER-GATHER, both shards are queried ===
+                                                  QUERY PLAN                                                  
+--------------------------------------------------------------------------------------------------------------
+ Append
+   ->  Foreign Scan on dist.account_north account_1
+         Output: account_1.account_number, account_1.balance
+         Remote SQL: SELECT account_number, balance FROM bank.account WHERE ((account_number = '1000000092'))
+   ->  Foreign Scan on dist.account_south account_2
+         Output: account_2.account_number, account_2.balance
+         Remote SQL: SELECT account_number, balance FROM bank.account WHERE ((account_number = '1000000092'))
+
+
+=== SH4a. Aggregate PUSHED DOWN: each shard computes its own GROUP BY (partition-wise aggregate) ===
+                                                      QUERY PLAN                                                      
+----------------------------------------------------------------------------------------------------------------------
+ Append
+   ->  Foreign Scan
+         Output: ledger_entry.region, (count(*)), (sum(ledger_entry.amount))
+         Relations: Aggregate on (dist.ledger_north ledger_entry)
+         Remote SQL: SELECT region, count(*), sum(amount) FROM bank.ledger_entry WHERE ((direction = 'C')) GROUP BY 1
+   ->  Foreign Scan
+         Output: ledger_entry_1.region, (count(*)), (sum(ledger_entry_1.amount))
+         Relations: Aggregate on (dist.ledger_south ledger_entry_1)
+         Remote SQL: SELECT region, count(*), sum(amount) FROM bank.ledger_entry WHERE ((direction = 'C')) GROUP BY 1
+
+ region | credits |     value     
+--------+---------+---------------
+ NORTH  |  101221 | 3048285139.81
+ SOUTH  |  212425 | 4691227155.40
+
+
+=== SH4b. Aggregate NOT pushed down: date_trunc(timestamptz) is only STABLE (depends on TimeZone), ===
+===       so postgres_fdw will not ship it. Raw rows travel to the coordinator and are grouped there   ===
+                                                        QUERY PLAN                                                        
+--------------------------------------------------------------------------------------------------------------------------
+ HashAggregate
+   Output: ledger_entry.region, (date_trunc('month'::text, ledger_entry.created_at)), count(*), sum(ledger_entry.amount)
+   Group Key: ledger_entry.region, (date_trunc('month'::text, ledger_entry.created_at))
+   ->  Append
+         ->  Foreign Scan on dist.ledger_north ledger_entry_1
+               Output: ledger_entry_1.region, date_trunc('month'::text, ledger_entry_1.created_at), ledger_entry_1.amount
+               Remote SQL: SELECT region, amount, created_at FROM bank.ledger_entry WHERE ((direction = 'C'))
+         ->  Foreign Scan on dist.ledger_south ledger_entry_2
+               Output: ledger_entry_2.region, date_trunc('month'::text, ledger_entry_2.created_at), ledger_entry_2.amount
+               Remote SQL: SELECT region, amount, created_at FROM bank.ledger_entry WHERE ((direction = 'C'))
+
+ region |  month  | credits |    value     
+--------+---------+---------+--------------
+ NORTH  | 2026-08 |   10328 | 322369061.87
+ SOUTH  | 2026-08 |   15301 | 458481068.61
+ NORTH  | 2026-09 |    9949 | 299841027.58
+ SOUTH  | 2026-09 |   15014 | 458309636.50
+ NORTH  | 2026-10 |   10072 | 303374800.16
+ SOUTH  | 2026-10 |   15006 | 452611071.83
+ SOUTH  | 2026-11 |   60591 | 116030003.00
+
+
+=== SH5. Cost of distribution: same statement, local table vs sharded tables ===
+Timing is on.
+ count  |      sum       
+--------+----------------
+ 670435 | 16282813590.42
+
+Time: 76.956 ms
+ count  |      sum       
+--------+----------------
+ 670435 | 16282813590.42
+
+Time: 419.513 ms
+Timing is off.
+
+=== SH6a. Join inside ONE shard, default fdw costing: the coordinator only has LOCAL estimates ===
+===        for the remote tables, so it may pull far more rows than needed            ===
+                                                                                  QUERY PLAN                                                                                   
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit
+   Output: a.account_number, l.created_at, l.direction, l.amount
+   ->  Nested Loop
+         Output: a.account_number, l.created_at, l.direction, l.amount
+         Join Filter: (a.account_number = l.account_number)
+         ->  Foreign Scan on dist.ledger_south l
+               Output: l.created_at, l.direction, l.amount, l.account_number, l.region
+               Remote SQL: SELECT account_number, region, direction, amount, created_at FROM bank.ledger_entry WHERE ((region = 'SOUTH')) ORDER BY created_at DESC NULLS FIRST
+         ->  Materialize
+               Output: a.account_number, a.region
+               ->  Foreign Scan on dist.account_south a
+                     Output: a.account_number, a.region
+                     Remote SQL: SELECT account_number, region FROM bank.account WHERE ((region = 'SOUTH')) AND ((customer_id = 2))
+
+Timing is on.
+ account_number |          created_at           | direction |  amount   
+----------------+-------------------------------+-----------+-----------
+ 1000000027     | 2026-10-17 13:38:29.103642+01 | C         |    367.75
+ 1000000027     | 2026-10-08 06:22:35.961833+01 | C         |    101.17
+ 1000000027     | 2026-09-10 19:33:06.864572+01 | D         |    819.02
+ 1000000027     | 2026-08-30 19:30:01.749642+01 | D         | 123931.36
+ 1000000027     | 2026-08-21 07:23:16.104374+01 | C         |    284.95
+
+Time: 617.565 ms
+Timing is off.
+
+=== SH6b. Same join with use_remote_estimate = true: the shard is asked for real row counts, ===
+===        and the plan becomes a parameterised lookup per account                       ===
+ALTER FOREIGN TABLE
+ALTER FOREIGN TABLE
+                                                                                        QUERY PLAN                                                                                         
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit
+   Output: a.account_number, l.created_at, l.direction, l.amount
+   ->  Sort
+         Output: a.account_number, l.created_at, l.direction, l.amount
+         Sort Key: l.created_at DESC
+         ->  Nested Loop
+               Output: a.account_number, l.created_at, l.direction, l.amount
+               ->  Foreign Scan on dist.account_south a
+                     Output: a.account_number, a.region
+                     Remote SQL: SELECT account_number, region FROM bank.account WHERE ((region = 'SOUTH')) AND ((customer_id = 2))
+               ->  Foreign Scan on dist.ledger_south l
+                     Output: l.created_at, l.direction, l.amount, l.account_number, l.region
+                     Remote SQL: SELECT account_number, region, direction, amount, created_at FROM bank.ledger_entry WHERE ((region = 'SOUTH')) AND ((account_number = $1::character(10)))
+
+Timing is on.
+ account_number |          created_at           | direction |  amount   
+----------------+-------------------------------+-----------+-----------
+ 1000000027     | 2026-10-17 13:38:29.103642+01 | C         |    367.75
+ 1000000027     | 2026-10-08 06:22:35.961833+01 | C         |    101.17
+ 1000000027     | 2026-09-10 19:33:06.864572+01 | D         |    819.02
+ 1000000027     | 2026-08-30 19:30:01.749642+01 | D         | 123931.36
+ 1000000027     | 2026-08-21 07:23:16.104374+01 | C         |    284.95
+
+Time: 4.437 ms
+Timing is off.
+ALTER FOREIGN TABLE
+ALTER FOREIGN TABLE

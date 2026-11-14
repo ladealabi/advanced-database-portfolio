@@ -1,0 +1,55 @@
+psql:portfolio-5-distributed-cloud/sharding/01_coordinator.sql:7: NOTICE:  extension "postgres_fdw" already exists, skipping
+CREATE EXTENSION
+psql:portfolio-5-distributed-cloud/sharding/01_coordinator.sql:8: NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to table dist.account
+drop cascades to table dist.ledger_entry
+DROP SCHEMA
+CREATE SCHEMA
+psql:portfolio-5-distributed-cloud/sharding/01_coordinator.sql:11: NOTICE:  drop cascades to user mapping for postgres on server shard_south
+DROP SERVER
+psql:portfolio-5-distributed-cloud/sharding/01_coordinator.sql:12: NOTICE:  drop cascades to user mapping for postgres on server shard_north
+DROP SERVER
+CREATE SERVER
+CREATE SERVER
+CREATE USER MAPPING
+CREATE USER MAPPING
+CREATE TABLE
+CREATE FOREIGN TABLE
+CREATE FOREIGN TABLE
+CREATE TABLE
+CREATE FOREIGN TABLE
+CREATE FOREIGN TABLE
+Timing is on.
+psql:portfolio-5-distributed-cloud/sharding/01_coordinator.sql:45: ERROR:  could not connect to server "shard_south"
+DETAIL:  connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+Time: 7.961 ms
+psql:portfolio-5-distributed-cloud/sharding/01_coordinator.sql:53: ERROR:  could not connect to server "shard_south"
+DETAIL:  connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+Time: 753.110 ms
+Timing is off.
+psql:portfolio-5-distributed-cloud/sharding/01_coordinator.sql:56: ERROR:  could not connect to server "shard_south"
+DETAIL:  connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+psql:portfolio-5-distributed-cloud/sharding/01_coordinator.sql:56: ERROR:  could not connect to server "shard_north"
+DETAIL:  connection to server at "localhost" (::1), port 5435 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5435 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+psql:portfolio-5-distributed-cloud/sharding/01_coordinator.sql:57: ERROR:  could not connect to server "shard_south"
+DETAIL:  connection to server at "localhost" (::1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5434 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+psql:portfolio-5-distributed-cloud/sharding/01_coordinator.sql:57: ERROR:  could not connect to server "shard_north"
+DETAIL:  connection to server at "localhost" (::1), port 5435 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5435 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?

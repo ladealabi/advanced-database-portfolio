@@ -1,0 +1,42 @@
+flowchart LR
+    subgraph CH["Channels"]
+        APP["Mobile app / Web"]
+        USSD["USSD gateway"]
+        POS["POS / ATM switch"]
+    end
+
+    APP --> GW
+    USSD --> GW
+    POS --> GW
+    GW["API gateway + core banking services<br/>(stateless, autoscaled)"]
+
+    subgraph LAG["Primary site: Lagos (2 availability zones)"]
+        PGB["PgBouncer<br/>connection pooling"]
+        PGP[("PostgreSQL PRIMARY<br/>ledger: system of record")]
+        PGS[("Sync standby<br/>other zone, RPO = 0")]
+        PGR[("Read replica<br/>reports / statements")]
+        RED[("Redis primary + replica<br/>sessions, limits, cache")]
+        M1[("MongoDB rs0 member 1")]
+    end
+
+    subgraph ABJ["DR site: Abuja"]
+        PGD[("PostgreSQL async standby<br/>RPO seconds, promotable")]
+        M2[("MongoDB rs0 member 2")]
+    end
+
+    subgraph THIRD["Third site / cloud region"]
+        M3[("MongoDB rs0 member 3<br/>election tie-breaker")]
+        OBJ[["Object storage<br/>pgBackRest WAL archive<br/>+ nightly full backups, encrypted"]]
+    end
+
+    GW --> PGB --> PGP
+    GW --> RED
+    GW --> M1
+    PGP -- "sync WAL (remote_apply)" --> PGS
+    PGP -- "async WAL" --> PGR
+    PGP -- "async WAL over WAN" --> PGD
+    PGP -- "WAL archive (PITR)" --> OBJ
+    M1 <-- "oplog" --> M2
+    M1 <-- "oplog" --> M3
+    PGP -. "CDC / nightly export" .-> M1
+    PGS -. "Patroni + etcd:<br/>automatic failover" .- PGP

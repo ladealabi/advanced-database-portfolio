@@ -1,0 +1,112 @@
+
+==================== R0. Primary settings ====================
+           name            | setting 
+---------------------------+---------
+ hot_standby               | on
+ max_wal_senders           | 10
+ synchronous_commit        | on
+ synchronous_standby_names | 
+ wal_level                 | replica
+(5 rows)
+
+
+==================== R1. Build a hot standby with pg_basebackup (-R writes primary_conninfo + standby.signal) ====================
+base backup finished in 1987 ms
+primary_conninfo = 'user=postgres passfile=''/Users/mac/.pgpass'' channel_binding=prefer host=localhost port=5432 application_name=standby_lagos2 sslmode=prefer sslcompression=0 sslcertmode=allow sslsni=1 ssl_min_protocol_version=TLSv1.2 gssencmode=disable krbsrvname=postgres gssdelegation=0 target_session_attrs=any load_balance_hosts=disable'
+/Users/mac/pgdemo/standby/standby.signal
+server started
+
+==================== R2. Replication status on the primary, and reads served by the standby ====================
+-[ RECORD 1 ]----+----------------
+application_name | standby_lagos2
+client_addr      | ::1
+state            | streaming
+sync_state       | async
+sent_lsn         | 0/5A000000
+replay_lsn       | 0/5A000000
+write_lag        | 00:00:00.000115
+flush_lag        | 00:00:00.000115
+replay_lag       | 00:00:00.000115
+
+ standby_mode | accounts | total_deposits  
+--------------+----------+-----------------
+ t            |    30104 | 200000000000.00
+(1 row)
+
+
+==================== R3. The standby is READ-ONLY ====================
+ERROR:  cannot execute UPDATE in a read-only transaction
+
+==================== R4. ASYNCHRONOUS replication: a write is visible on the standby only after replay ====================
+primary: 1,500,000 probe rows committed. Polling the standby:
+  +79 ms  standby sees 0 rows
+  +275 ms  standby sees 1500000 rows
+=> the standby returned STALE data (0 rows) for a short window: eventual consistency.
+   Because a transaction replays atomically, the standby never shows a partial result.
+ application_name | sync_state | bytes_behind |  replay_lag   
+------------------+------------+--------------+---------------
+ standby_lagos2   | async      |            0 | 00:00:00.0814
+(1 row)
+
+
+==================== R5. SYNCHRONOUS replication (synchronous_commit = remote_apply) ====================
+ application_name | sync_state 
+------------------+------------
+ standby_lagos2   | sync
+(1 row)
+
+standby immediately after COMMIT returned on the primary (remote_apply means it must already be visible):
+ id |          written_at           
+----+-------------------------------
+  2 | 2026-11-14 12:31:02.745252+01
+(1 row)
+
+commit latency, local vs remote_apply:
+  synchronous_commit=local (1 client, 500 single-row commits):
+     latency average = 0.154 ms
+     tps = 6502.288806 (without initial connection time)
+  synchronous_commit=remote_apply (1 client, 500 single-row commits):
+     latency average = 0.319 ms
+     tps = 3134.953477 (without initial connection time)
+
+==================== R6. Sync standby DOWN: a COMMIT waits rather than risk losing data (CAP: choose C over A) ====================
+standby stopped. A synchronous INSERT is started in the background...
+3 s later the writer is still waiting:
+  pid  | state  | wait_event_type | wait_event |   waiting_for   |                     query                     
+-------+--------+-----------------+------------+-----------------+-----------------------------------------------
+ 24604 | active | IPC             | SyncRep    | 00:00:03.013057 | SET synchronous_commit = on; INSERT INTO bank
+(1 row)
+
+operator cancels the wait:
+  [writer] WARNING:  canceling wait for synchronous replication due to user request
+  [writer] DETAIL:  The transaction has already committed locally, but might not have been replicated to the standby.
+(production setups use 'ANY 1 (s1, s2)' with two standbys, so one failure does not block writes)
+server started
+
+==================== R7. FAILOVER: primary crashes, standby promoted ====================
+last txn_id committed on primary before crash: 579872
+server stopped
+  primary: psql: error: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+server promoted
+promotion took 151 ms
+ still_standby | last_txn_on_new_primary 
+---------------+-------------------------
+ f             |                  579872
+(1 row)
+
+writes on the NEW primary:
+ new_txn 
+---------
+  579873
+(1 row)
+
+RPO check: every txn committed before the crash exists on the promoted node -> no data loss
+
+==================== R8. Clean-up: retire the promoted demo node, restart the original primary ====================
+server stopped
+server started
+       status        | in_recovery 
+---------------------+-------------
+ primary back online | f
+(1 row)
+
